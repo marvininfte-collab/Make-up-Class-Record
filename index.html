@@ -1,0 +1,941 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="補課追蹤簿">
+<meta name="theme-color" content="#334A7D">
+<title>補課追蹤簿</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600&display=swap">
+<style>
+:root{
+  --ground:#F4F6F8; --surface:#FFFFFF; --surface-2:#EAEEF3;
+  --line:#DBE1E9; --line-soft:#E9EDF2;
+  --ink:#18202B; --ink-2:#4B576A; --ink-3:#7E8899;
+  --accent:#334A7D; --accent-ink:#FFFFFF; --accent-soft:#E3E9F5;
+  --ok:#2C6B51; --ok-soft:#E0EEE7;
+  --video:#5A4A86; --video-soft:#EAE6F4;
+  --warn:#87600F; --warn-soft:#F5EDDB;
+  --bad:#A5423B; --bad-soft:#F6E3E1;
+  --shadow:0 1px 2px rgba(24,32,43,.06), 0 6px 18px rgba(24,32,43,.05);
+  --radius:12px;
+  --serif:"Noto Serif TC","Songti TC",Georgia,serif;
+  --sans:"Noto Sans TC",-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#11151B; --surface:#191F27; --surface-2:#222A34; --line:#2E3843; --line-soft:#252E38;
+    --ink:#E7EBF1; --ink-2:#A7B1C0; --ink-3:#78828F;
+    --accent:#93AAD9; --accent-ink:#131820; --accent-soft:#222D42;
+    --ok:#7CC7A2; --ok-soft:#1B2C25;
+    --video:#AFA0DE; --video-soft:#241F35;
+    --warn:#D6AE64; --warn-soft:#2E2617;
+    --bad:#E28C84; --bad-soft:#32201E;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.28);
+  }
+}
+*{box-sizing:border-box}
+html{background:var(--ground)}
+body{margin:0; background:var(--ground); color:var(--ink);
+  font-family:var(--sans); font-size:15px; line-height:1.6; -webkit-text-size-adjust:100%;}
+img{max-width:100%}
+[hidden]{display:none !important}
+.shell{max-width:600px; margin:0 auto; padding:0 16px 108px;}
+
+.top{position:sticky; top:0; z-index:20; background:var(--ground); padding-top:calc(18px + env(safe-area-inset-top));}
+.top::after{content:""; display:block; height:14px; background:linear-gradient(to bottom,var(--ground),transparent);}
+.brand{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;}
+.brand h1{font-family:var(--serif); font-weight:600; font-size:23px; letter-spacing:.02em; margin:0;}
+.brand .sub{font-size:12.5px; color:var(--ink-3); letter-spacing:.04em;}
+.statusline{margin-top:8px; font-family:var(--mono); font-size:11.5px; letter-spacing:.03em;
+  color:var(--ink-3); display:flex; align-items:center; gap:7px;}
+.dot{width:7px; height:7px; border-radius:50%; background:var(--ok); flex:none;}
+.dot.local{background:var(--warn)} .dot.err{background:var(--bad)}
+
+.view{display:none} .view.on{display:block}
+.sec-title{font-size:11.5px; font-weight:700; letter-spacing:.14em; color:var(--ink-3);
+  text-transform:uppercase; margin:26px 0 10px; display:flex; justify-content:space-between;
+  align-items:center; gap:10px;}
+.sec-title .count{font-family:var(--mono); font-weight:500; letter-spacing:.04em;}
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  padding:16px; box-shadow:var(--shadow);}
+.stack{display:flex; flex-direction:column; gap:10px;}
+.row{display:flex; gap:10px;} .row > *{flex:1; min-width:0;}
+label.f{display:flex; flex-direction:column; gap:6px;}
+label.f > span{font-size:12px; font-weight:500; color:var(--ink-2); letter-spacing:.03em;}
+input,select,textarea,button{font-family:inherit; font-size:15px;}
+input[type=text],input[type=url],input[type=date],input[type=month],select,textarea{
+  width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:9px;
+  background:var(--surface); color:var(--ink); appearance:none;}
+input[type=date],input[type=month]{font-family:var(--mono); font-size:14px;}
+textarea{resize:vertical; min-height:64px; line-height:1.55;}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,.chip:focus-visible{
+  outline:2px solid var(--accent); outline-offset:2px;}
+.hint{font-size:12.5px; color:var(--ink-3); line-height:1.6; margin:0;}
+.hint code{font-family:var(--mono); font-size:11.5px; background:var(--surface-2); padding:1px 5px; border-radius:4px;}
+
+button{cursor:pointer; border:none; background:none; color:inherit;}
+.btn{padding:12px 16px; border-radius:9px; background:var(--accent); color:var(--accent-ink);
+  font-weight:700; letter-spacing:.04em;}
+.btn:hover{opacity:.88}
+.btn[disabled]{opacity:.5; cursor:default;}
+.btn.ghost{background:var(--surface-2); color:var(--ink); font-weight:500;}
+.btn.wide{width:100%}
+.btn.sm{padding:8px 12px; font-size:13px; border-radius:8px;}
+.btn.danger{background:var(--bad-soft); color:var(--bad); font-weight:700;}
+
+.picker{display:flex; flex-wrap:wrap; gap:7px;}
+.chip{padding:8px 13px; border-radius:999px; border:1px solid var(--line); background:var(--surface);
+  color:var(--ink-2); font-size:14px; line-height:1.2;}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:500;}
+.chip.tab{font-size:13px; padding:7px 12px;}
+.picker.empty{color:var(--ink-3); font-size:13px;}
+
+details.more{border-top:1px solid var(--line-soft); padding-top:12px;}
+details.more > summary{cursor:pointer; list-style:none; font-size:13px; color:var(--ink-2);
+  font-weight:500; display:flex; align-items:center; gap:6px;}
+details.more > summary::-webkit-details-marker{display:none}
+details.more > summary::before{content:"＋"; font-family:var(--mono); color:var(--ink-3);}
+details.more[open] > summary::before{content:"－"}
+details.more .stack{margin-top:12px}
+
+.cards{display:flex; flex-direction:column; gap:9px;}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  padding:13px 14px; box-shadow:var(--shadow); border-left:3px solid var(--line);}
+.card.s-pending{border-left-color:var(--warn)} .card.s-late{border-left-color:var(--bad)}
+.card.s-class{border-left-color:var(--ok)} .card.s-video{border-left-color:var(--video)}
+.card-head{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;}
+.who{font-size:16px; font-weight:700; letter-spacing:.02em;}
+.klass{font-size:12px; color:var(--ink-3);}
+.meta{margin-top:3px; font-family:var(--mono); font-size:12.5px; color:var(--ink-2);
+  display:flex; flex-wrap:wrap; gap:4px 12px;}
+.note{margin-top:6px; font-size:13px; color:var(--ink-2); line-height:1.5;}
+.pill{margin-left:auto; font-size:11.5px; font-weight:700; letter-spacing:.05em;
+  padding:3px 9px; border-radius:999px; white-space:nowrap;}
+.p-pending{background:var(--warn-soft); color:var(--warn)}
+.p-late{background:var(--bad-soft); color:var(--bad)}
+.p-class{background:var(--ok-soft); color:var(--ok)}
+.p-video{background:var(--video-soft); color:var(--video)}
+.acts{display:flex; gap:7px; margin-top:11px; flex-wrap:wrap;}
+.acts .btn{flex:1; min-width:104px;}
+.act-ok{background:var(--ok-soft); color:var(--ok); font-weight:700;}
+.act-video{background:var(--video-soft); color:var(--video); font-weight:700;}
+.linkbtn{background:none; padding:0; font-size:12.5px; color:var(--ink-3);
+  text-decoration:underline; text-underline-offset:3px; font-weight:400;}
+.linkbtn:hover{color:var(--ink)}
+.card-foot{display:flex; gap:14px; margin-top:9px;}
+.empty{text-align:center; padding:34px 18px; color:var(--ink-3); font-size:14px;
+  border:1px dashed var(--line); border-radius:var(--radius); line-height:1.7;}
+
+.tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
+.tile{background:var(--surface); border:1px solid var(--line); border-radius:10px;
+  padding:11px 8px; text-align:center;}
+.tile b{display:block; font-family:var(--mono); font-size:21px; font-weight:500; line-height:1.25;}
+.tile span{font-size:11px; color:var(--ink-3); letter-spacing:.04em;}
+.tile.t-pending b{color:var(--warn)} .tile.t-late b{color:var(--bad)}
+.tile.t-class b{color:var(--ok)} .tile.t-video b{color:var(--video)}
+
+.tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface);}
+table{border-collapse:collapse; width:100%; font-size:14px;}
+th,td{padding:9px 12px; text-align:left; border-bottom:1px solid var(--line-soft); white-space:nowrap;}
+th{font-size:11px; letter-spacing:.1em; color:var(--ink-3); font-weight:700; text-transform:uppercase;}
+td.n{font-family:var(--mono); font-variant-numeric:tabular-nums; text-align:right;}
+tr:last-child td{border-bottom:none}
+
+.listrow{display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line-soft);}
+.listrow:last-child{border-bottom:none}
+.listrow .nm{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.listrow .qty{font-family:var(--mono); font-size:12px; color:var(--ink-3);}
+
+.nav{position:fixed; left:0; right:0; bottom:0; z-index:30; background:var(--surface);
+  border-top:1px solid var(--line); padding:6px 8px calc(6px + env(safe-area-inset-bottom));}
+.nav-in{max-width:600px; margin:0 auto; display:grid; grid-template-columns:repeat(4,1fr);}
+.nav button{padding:8px 4px 7px; font-size:12.5px; color:var(--ink-3); letter-spacing:.06em;
+  border-top:2px solid transparent; margin-top:-1px; display:flex; flex-direction:column;
+  align-items:center; gap:3px;}
+.nav button .badge{font-family:var(--mono); font-size:10px; min-width:17px; padding:0 4px;
+  border-radius:999px; background:var(--surface-2); color:var(--ink-3); line-height:16px;}
+.nav button[aria-current="true"]{color:var(--accent); font-weight:700; border-top-color:var(--accent);}
+.nav button[aria-current="true"] .badge{background:var(--accent-soft); color:var(--accent);}
+
+.scrim{position:fixed; inset:0; z-index:40; background:rgba(16,21,28,.42);
+  display:flex; align-items:flex-end; justify-content:center;}
+.sheet{width:100%; max-width:600px; background:var(--surface); color:var(--ink);
+  border-radius:16px 16px 0 0; padding:18px 16px calc(20px + env(safe-area-inset-bottom));
+  max-height:88vh; overflow-y:auto;}
+.sheet h2{font-family:var(--serif); font-size:18px; margin:0 0 14px; font-weight:600;}
+.toast{position:fixed; left:50%; transform:translateX(-50%); bottom:86px; z-index:50;
+  background:var(--ink); color:var(--ground); padding:10px 16px; border-radius:999px;
+  font-size:13.5px; box-shadow:var(--shadow); max-width:88vw; text-align:center;}
+.setupcode{font-family:var(--mono); font-size:11px; line-height:1.5; min-height:220px; white-space:pre;}
+ol.steps{margin:0; padding-left:20px; font-size:13px; color:var(--ink-2); line-height:1.85;}
+ol.steps li{margin-bottom:4px}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important} }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <div class="top">
+    <div class="brand">
+      <h1>補課追蹤簿</h1>
+      <span class="sub">請假登記 · 補課進度</span>
+    </div>
+    <div class="statusline"><span class="dot local" id="dot"></span><span id="statustext">載入中…</span></div>
+  </div>
+
+  <section class="view" id="v-log">
+    <div class="sec-title">登記請假</div>
+    <div class="panel stack">
+      <label class="f"><span>班級</span><select id="logClass"></select></label>
+      <div>
+        <div class="sec-title" style="margin:2px 0 8px">學生 <span class="count" id="logSelCount">未選</span></div>
+        <div class="picker" id="logStudents"></div>
+      </div>
+      <label class="f"><span>缺課日期</span><input type="date" id="logDate"></label>
+      <details class="more">
+        <summary>補充內容（選填）</summary>
+        <div class="stack">
+          <div class="row">
+            <label class="f"><span>事由</span>
+              <select id="logReason">
+                <option value="">未填</option>
+                <option>病假</option><option>事假</option><option>公假</option>
+                <option>家庭因素</option><option>其他</option>
+              </select>
+            </label>
+            <label class="f"><span>缺課單元／進度</span><input type="text" id="logUnit" placeholder="例：MJ12 U3"></label>
+          </div>
+          <label class="f"><span>備註</span><textarea id="logNote" placeholder="例：家長已來電，下週三可補"></textarea></label>
+        </div>
+      </details>
+      <button class="btn wide" id="logSubmit">登記請假</button>
+      <p class="hint">可一次點選多位學生，同一天的缺課會一起建立紀錄。登記後到「待補」標記補課方式。</p>
+    </div>
+  </section>
+
+  <section class="view" id="v-todo">
+    <div class="sec-title">待補課 <span class="count" id="todoCount"></span></div>
+    <div class="picker" id="todoFilter" style="margin-bottom:12px"></div>
+    <div class="cards" id="todoList"></div>
+  </section>
+
+  <section class="view" id="v-rec">
+    <div class="sec-title">統計</div>
+    <div class="row" style="margin-bottom:10px">
+      <label class="f"><span>班級</span><select id="recClass"></select></label>
+      <label class="f"><span>月份</span><input type="month" id="recMonth"></label>
+    </div>
+    <div class="tiles" id="recTiles"></div>
+    <div class="sec-title">各班級 <span class="count">單位：次</span></div>
+    <div class="tablewrap"><table id="tblClass"></table></div>
+    <div class="sec-title">請假最多的學生 <span class="count">前 10 名</span></div>
+    <div class="tablewrap"><table id="tblStudent"></table></div>
+    <div class="sec-title">明細 <span class="count" id="recCount"></span></div>
+    <div class="picker" id="recStatus" style="margin-bottom:12px"></div>
+    <div class="cards" id="recList"></div>
+    <button class="btn ghost wide" id="exportBtn" style="margin-top:14px">匯出 CSV</button>
+  </section>
+
+  <section class="view" id="v-set">
+    <div class="sec-title">班級</div>
+    <div class="panel">
+      <div id="classList"></div>
+      <div class="row" style="margin-top:12px">
+        <input type="text" id="newClass" placeholder="新增班級名稱">
+        <button class="btn sm" id="addClass" style="flex:0 0 auto">新增</button>
+      </div>
+    </div>
+
+    <div class="sec-title">學生名單</div>
+    <div class="panel stack">
+      <label class="f"><span>選擇班級</span><select id="setClass"></select></label>
+      <div id="studentList"></div>
+      <label class="f"><span>新增學生（一行一位，可整批貼上）</span>
+        <textarea id="newStudents" placeholder="王小明&#10;陳美美&#10;林大衛"></textarea>
+      </label>
+      <button class="btn ghost" id="addStudents">加入名單</button>
+    </div>
+
+    <div class="sec-title">雲端同步 <span class="count" id="syncState"></span></div>
+    <div class="panel stack">
+      <label class="f"><span>Google Apps Script 網址</span>
+        <input type="url" id="syncUrl" placeholder="https://script.google.com/macros/s/..../exec">
+      </label>
+      <div class="row">
+        <button class="btn" id="saveSync">儲存並連線</button>
+        <button class="btn ghost" id="syncNow">立即同步</button>
+      </div>
+      <p class="hint" id="syncHint"></p>
+      <details class="more">
+        <summary>第一次設定：建立 Google 試算表同步（約 5 分鐘）</summary>
+        <div class="stack">
+          <ol class="steps">
+            <li>到 <code>sheets.new</code> 建立一份新的 Google 試算表，命名為「補課紀錄」。</li>
+            <li>上方選單 <code>擴充功能 → Apps Script</code>。</li>
+            <li>把編輯器裡原有的內容全部刪掉，貼上下面這段程式碼，按儲存。</li>
+            <li>右上角 <code>部署 → 新增部署作業</code>，類型選 <code>網頁應用程式</code>。</li>
+            <li>「執行身分」選 <b>我</b>；「誰可以存取」選 <b>所有人</b>，然後部署、授權。</li>
+            <li>複製產生的網址（結尾是 <code>/exec</code>），貼回上面欄位按「儲存並連線」。</li>
+            <li>同事只要拿到這個網頁的網址就能用，不需要任何帳號。</li>
+          </ol>
+          <button class="btn ghost sm" id="copyCode">複製程式碼</button>
+          <textarea class="setupcode" id="gsCode" readonly spellcheck="false">
+const SHEETS = {
+  classes:  ['id','name','createdAt','updatedAt','deleted'],
+  students: ['id','classId','name','createdAt','updatedAt','deleted'],
+  records:  ['id','studentId','studentName','classId','className','absentDate',
+             'reason','unit','note','makeupType','makeupDate','createdAt','updatedAt','deleted']
+};
+
+function sh_(name){
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(name);
+  if (!sh) sh = ss.insertSheet(name);
+  if (sh.getLastRow() === 0) sh.appendRow(SHEETS[name]);
+  return sh;
+}
+
+function readAll_(name){
+  const sh = sh_(name), cols = SHEETS[name], last = sh.getLastRow();
+  if (last < 2) return [];
+  const vals = sh.getRange(2, 1, last - 1, cols.length).getValues();
+  const tz = Session.getScriptTimeZone();
+  return vals.filter(function(r){ return r[0] !== ''; }).map(function(r){
+    const o = {};
+    cols.forEach(function(c, i){
+      let v = r[i];
+      if (Object.prototype.toString.call(v) === '[object Date]')
+        v = Utilities.formatDate(v, tz, 'yyyy-MM-dd');
+      o[c] = v === null ? '' : v;
+    });
+    o.id = String(o.id);
+    o.deleted = (o.deleted === true || String(o.deleted).toLowerCase() === 'true');
+    return o;
+  });
+}
+
+function upsert_(name, obj){
+  const sh = sh_(name), cols = SHEETS[name], last = sh.getLastRow();
+  const row = cols.map(function(c){ return obj[c] === undefined ? '' : obj[c]; });
+  const ids = last > 1 ? sh.getRange(2, 1, last - 1, 1).getValues() : [];
+  for (let i = 0; i < ids.length; i++){
+    if (String(ids[i][0]) === String(obj.id)){
+      const rg = sh.getRange(i + 2, 1, 1, cols.length);
+      rg.setNumberFormat('@'); rg.setValues([row]);
+      return;
+    }
+  }
+  const rg = sh.getRange(last + 1, 1, 1, cols.length);
+  rg.setNumberFormat('@'); rg.setValues([row]);
+}
+
+function doGet(){
+  const data = { classes: readAll_('classes'), students: readAll_('students'), records: readAll_('records') };
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, data: data }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e){
+  const lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  try {
+    const body = JSON.parse(e.postData.contents);
+    (body.items || []).forEach(function(it){ upsert_(it.coll, it.obj); });
+    return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
+  }
+}
+</textarea>
+        </div>
+      </details>
+    </div>
+
+    <div class="sec-title">其他</div>
+    <div class="panel stack">
+      <p class="hint" id="aboutText"></p>
+      <button class="btn ghost sm" id="seedBtn">建立示範資料</button>
+    </div>
+  </section>
+</div>
+
+<nav class="nav">
+  <div class="nav-in">
+    <button data-go="todo">待補<span class="badge" id="badgeTodo">0</span></button>
+    <button data-go="log">登記<span class="badge">＋</span></button>
+    <button data-go="rec">紀錄<span class="badge" id="badgeRec">0</span></button>
+    <button data-go="set">設定<span class="badge">⚙</span></button>
+  </div>
+</nav>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <h2 id="sheetTitle">編輯紀錄</h2>
+    <div class="stack" id="sheetBody"></div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function(){
+"use strict";
+
+var S = { classes:[], students:[], records:[], tomb:{}, queue:[],
+          view:"todo", url:"", syncing:false, lastSync:"", syncErr:"",
+          logPicked:{}, todoClass:"", recStatus:"all" };
+var LS="mt-data-v2", LS_URL="mt-url-v2";
+
+function $(id){ return document.getElementById(id); }
+function el(t,c,x){ var n=document.createElement(t); if(c) n.className=c; if(x!=null) n.textContent=x; return n; }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function pad(n){ return (n<10?"0":"")+n; }
+function today(){ var d=new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+function thisMonth(){ return today().slice(0,7); }
+function nowISO(){ return new Date().toISOString(); }
+function toast(m){ var t=$("toast"); t.textContent=m; t.hidden=false; clearTimeout(toast._t);
+  toast._t=setTimeout(function(){ t.hidden=true; },2400); }
+function dayDiff(a,b){ return Math.round((new Date(b+"T00:00:00")-new Date(a+"T00:00:00"))/86400000); }
+function statusOf(r){
+  if(r.makeupType==="class") return "class";
+  if(r.makeupType==="video") return "video";
+  return dayDiff(r.absentDate, today())>14 ? "late" : "pending";
+}
+var LABEL={pending:"待補課", late:"逾期未補", "class":"實體補課", video:"補課系統影片"};
+function className(id){ for(var i=0;i<S.classes.length;i++) if(S.classes[i].id===id) return S.classes[i].name; return "未分班"; }
+
+/* ---------- 本機儲存 ---------- */
+function loadLocal(){
+  try{ var o=JSON.parse(localStorage.getItem(LS)||"null");
+    if(o){ S.classes=o.classes||[]; S.students=o.students||[]; S.records=o.records||[];
+      S.tomb=o.tomb||{}; S.queue=o.queue||[]; } }catch(e){}
+  try{ S.url=localStorage.getItem(LS_URL)||""; }catch(e){}
+}
+function saveLocal(){
+  try{ localStorage.setItem(LS, JSON.stringify({classes:S.classes, students:S.students,
+    records:S.records, tomb:S.tomb, queue:S.queue})); }catch(e){}
+}
+
+/* ---------- 寫入 ---------- */
+function put(coll, obj){
+  obj.updatedAt = nowISO();
+  var arr=S[coll], i;
+  for(i=0;i<arr.length;i++) if(arr[i].id===obj.id){ arr[i]=obj; break; }
+  if(i===arr.length) arr.push(obj);
+  enqueue(coll, obj);
+  saveLocal(); renderAll();
+}
+function drop(coll, id){
+  var o=null;
+  S[coll].forEach(function(x){ if(x.id===id) o=x; });
+  var stamp=nowISO();
+  S.tomb[coll+"/"+id]=stamp;
+  if(o){ o.deleted=true; o.updatedAt=stamp; enqueue(coll,o); }
+  S[coll]=S[coll].filter(function(x){ return x.id!==id; });
+  saveLocal(); renderAll();
+}
+function enqueue(coll,obj){
+  var body={}; Object.keys(obj).forEach(function(k){ body[k]=obj[k]; });
+  S.queue = S.queue.filter(function(q){ return !(q.coll===coll && q.obj.id===obj.id); });
+  S.queue.push({coll:coll, obj:body});
+  scheduleFlush();
+}
+var flushTimer=null;
+function scheduleFlush(){
+  if(!S.url) return;
+  clearTimeout(flushTimer);
+  flushTimer=setTimeout(function(){ sync(); }, 900);
+}
+
+/* ---------- 同步 ---------- */
+function setSync(kind, text){
+  $("dot").className = "dot"+(kind==="ok"?"":(kind==="err"?" err":" local"));
+  $("statustext").textContent = text;
+  var q=S.queue.length;
+  $("syncState").textContent = S.url ? (q? q+" 筆待上傳":"已連線") : "未設定";
+  $("syncHint").textContent = S.url
+    ? "資料會自動存到你的 Google 試算表，任何人開這個網址都看得到同一份紀錄，不需要登入。離線時仍可登記，恢復連線後自動補傳。"
+    : "還沒連線。目前紀錄只存在這台裝置的瀏覽器，換手機不會同步。照下面步驟連上 Google 試算表就能多人共用。";
+  $("aboutText").textContent = "這是一個獨立網頁，可加到手機主畫面像 App 一樣使用。統計資料可匯出 CSV 備份。";
+}
+function mergeRemote(data){
+  ["classes","students","records"].forEach(function(coll){
+    var byId={};
+    S[coll].forEach(function(o){ byId[o.id]=o; });
+    (data[coll]||[]).forEach(function(r){
+      r.id=String(r.id);
+      var t=S.tomb[coll+"/"+r.id];
+      if(r.deleted){ delete byId[r.id]; S.tomb[coll+"/"+r.id]=r.updatedAt||nowISO(); return; }
+      if(t && String(t) >= String(r.updatedAt||"")) return;
+      var l=byId[r.id];
+      if(!l || String(r.updatedAt||"") >= String(l.updatedAt||"")) byId[r.id]=r;
+    });
+    S[coll]=Object.keys(byId).map(function(k){ return byId[k]; });
+  });
+  saveLocal();
+}
+async function sync(manual){
+  if(!S.url){ setSync("local","本機模式"); return; }
+  if(S.syncing) return;
+  S.syncing=true; setSync("ok","同步中…");
+  try{
+    if(S.queue.length){
+      var batch=S.queue.slice(0,200);
+      var res=await fetch(S.url, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"},
+        body: JSON.stringify({items:batch})});
+      var j=await res.json();
+      if(!j.ok) throw new Error(j.error||"上傳失敗");
+      S.queue=S.queue.slice(batch.length);
+      saveLocal();
+    }
+    var r2=await fetch(S.url+(S.url.indexOf("?")>=0?"&":"?")+"t="+Date.now());
+    var j2=await r2.json();
+    if(!j2.ok) throw new Error(j2.error||"讀取失敗");
+    mergeRemote(j2.data||{});
+    S.lastSync=new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+    S.syncErr="";
+    setSync("ok","已同步 "+S.lastSync);
+    if(manual) toast("同步完成");
+  }catch(e){
+    S.syncErr=String(e && e.message || e);
+    setSync("err", S.queue.length ? "離線，"+S.queue.length+" 筆待上傳" : "連線失敗");
+    if(manual) toast("同步失敗，請檢查網址與部署權限");
+  }
+  S.syncing=false;
+  renderAll();
+}
+
+/* ---------- 登記 ---------- */
+function renderLog(){
+  var sel=$("logClass"), keep=sel.value;
+  sel.innerHTML="";
+  if(!S.classes.length) sel.appendChild(new Option("尚未建立班級",""));
+  S.classes.forEach(function(c){ sel.appendChild(new Option(c.name,c.id)); });
+  if(keep && S.classes.some(function(c){return c.id===keep;})) sel.value=keep;
+
+  var wrap=$("logStudents"); wrap.innerHTML="";
+  var list=S.students.filter(function(s){ return s.classId===sel.value; })
+    .sort(function(a,b){ return String(a.name).localeCompare(String(b.name),"zh-Hant"); });
+  if(!list.length){
+    wrap.className="picker empty";
+    wrap.textContent = S.classes.length ? "這個班級還沒有學生，先到「設定」加入名單。" : "先到「設定」建立班級與學生名單。";
+  } else {
+    wrap.className="picker";
+    list.forEach(function(s){
+      var b=el("button","chip",s.name); b.type="button";
+      b.setAttribute("aria-pressed", S.logPicked[s.id]?"true":"false");
+      b.onclick=function(){ if(S.logPicked[s.id]) delete S.logPicked[s.id]; else S.logPicked[s.id]=true; renderLog(); };
+      wrap.appendChild(b);
+    });
+  }
+  var n=Object.keys(S.logPicked).length;
+  $("logSelCount").textContent = n ? "已選 "+n+" 位" : "未選";
+}
+function submitLog(){
+  var ids=Object.keys(S.logPicked);
+  if(!ids.length){ toast("請先選擇學生"); return; }
+  var date=$("logDate").value||today(), cid=$("logClass").value;
+  ids.forEach(function(sid){
+    var st=null; S.students.forEach(function(x){ if(x.id===sid) st=x; });
+    put("records",{ id:uid(), studentId:sid, studentName:st?st.name:"（已刪除）",
+      classId:cid, className:className(cid), absentDate:date,
+      reason:$("logReason").value, unit:$("logUnit").value.trim(), note:$("logNote").value.trim(),
+      makeupType:"", makeupDate:"", createdAt:nowISO() });
+  });
+  toast("已登記 "+ids.length+" 筆");
+  S.logPicked={}; $("logUnit").value=""; $("logNote").value=""; $("logReason").value="";
+  go("todo");
+}
+
+/* ---------- 卡片 ---------- */
+function cardFor(r){
+  var st=statusOf(r), c=el("div","card s-"+st);
+  var head=el("div","card-head");
+  head.appendChild(el("span","who", r.studentName));
+  head.appendChild(el("span","klass", r.className||className(r.classId)));
+  head.appendChild(el("span","pill p-"+st, LABEL[st]));
+  c.appendChild(head);
+
+  var meta=el("div","meta");
+  meta.appendChild(el("span",null,"缺課 "+r.absentDate));
+  if(r.reason) meta.appendChild(el("span",null,r.reason));
+  if(r.unit) meta.appendChild(el("span",null,r.unit));
+  if(r.makeupType && r.makeupDate) meta.appendChild(el("span",null,(r.makeupType==="video"?"影片 ":"實體 ")+r.makeupDate));
+  if(!r.makeupType){ var g=dayDiff(r.absentDate, today()); if(g>0) meta.appendChild(el("span",null,"已過 "+g+" 天")); }
+  c.appendChild(meta);
+  if(r.note) c.appendChild(el("div","note", r.note));
+
+  if(!r.makeupType){
+    var acts=el("div","acts");
+    var b1=el("button","btn sm act-ok","實體補課完成"); b1.onclick=function(){ complete(r,"class"); };
+    var b2=el("button","btn sm act-video","已看補課影片"); b2.onclick=function(){ complete(r,"video"); };
+    acts.appendChild(b1); acts.appendChild(b2); c.appendChild(acts);
+  }
+  var foot=el("div","card-foot");
+  var e1=el("button","linkbtn","編輯"); e1.onclick=function(){ openSheet(r); };
+  foot.appendChild(e1);
+  if(r.makeupType){
+    var u=el("button","linkbtn","改回待補");
+    u.onclick=function(){ r.makeupType=""; r.makeupDate=""; put("records",r); };
+    foot.appendChild(u);
+  }
+  var e2=el("button","linkbtn","刪除");
+  e2.onclick=function(){ askConfirm("刪除紀錄","確定刪除「"+r.studentName+"　"+r.absentDate+"」這筆請假紀錄？","刪除",
+    function(){ drop("records", r.id); toast("已刪除"); }); };
+  foot.appendChild(e2);
+  c.appendChild(foot);
+  return c;
+}
+function complete(r,type){
+  r.makeupType=type; r.makeupDate=today(); put("records",r);
+  toast(type==="video"?"已記為補課系統影片":"已記為實體補課");
+}
+
+/* ---------- 待補 ---------- */
+function renderTodo(){
+  var f=$("todoFilter"); f.innerHTML="";
+  [{id:"",name:"全部班級"}].concat(S.classes).forEach(function(o){
+    var b=el("button","chip tab",o.name); b.type="button";
+    b.setAttribute("aria-pressed", S.todoClass===o.id?"true":"false");
+    b.onclick=function(){ S.todoClass=o.id; renderTodo(); };
+    f.appendChild(b);
+  });
+  var list=S.records.filter(function(r){ return !r.makeupType && (!S.todoClass || r.classId===S.todoClass); })
+    .sort(function(a,b){ return a.absentDate<b.absentDate?-1:1; });
+  $("todoCount").textContent = list.length ? list.length+" 筆" : "";
+  var box=$("todoList"); box.innerHTML="";
+  if(!list.length){
+    box.appendChild(el("div","empty", S.records.length ? "目前沒有待補的紀錄，全部都補完了。"
+      : "還沒有任何紀錄。到「登記」選學生和日期就能開始。"));
+    return;
+  }
+  list.forEach(function(r){ box.appendChild(cardFor(r)); });
+}
+
+/* ---------- 紀錄／統計 ---------- */
+function filteredRecords(){
+  var cid=$("recClass").value, m=$("recMonth").value;
+  return S.records.filter(function(r){
+    if(cid && r.classId!==cid) return false;
+    if(m && String(r.absentDate).slice(0,7)!==m) return false;
+    return true;
+  });
+}
+function buildTable(tb,heads,rows,emptyMsg){
+  tb.innerHTML="";
+  var thead=el("thead"), tr=el("tr");
+  heads.forEach(function(h){ tr.appendChild(el("th",null,h)); });
+  thead.appendChild(tr); tb.appendChild(thead);
+  var tbody=el("tbody");
+  if(!rows.length){ var r0=el("tr"), td=el("td",null,emptyMsg);
+    td.colSpan=heads.length; td.style.color="var(--ink-3)"; r0.appendChild(td); tbody.appendChild(r0); }
+  rows.forEach(function(row){
+    var tr2=el("tr");
+    row.forEach(function(cell){ tr2.appendChild(el("td", typeof cell==="number"?"n":null, String(cell))); });
+    tbody.appendChild(tr2);
+  });
+  tb.appendChild(tbody);
+}
+function renderRec(){
+  var sel=$("recClass"), keep=sel.value;
+  sel.innerHTML=""; sel.appendChild(new Option("全部班級",""));
+  S.classes.forEach(function(c){ sel.appendChild(new Option(c.name,c.id)); });
+  if(keep) sel.value=keep;
+
+  var rs=filteredRecords(), count={pending:0,late:0,"class":0,video:0};
+  rs.forEach(function(r){ count[statusOf(r)]++; });
+  var tiles=$("recTiles"); tiles.innerHTML="";
+  [["t-pending",count.pending,"待補"],["t-late",count.late,"逾期"],
+   ["t-class",count["class"],"實體補課"],["t-video",count.video,"影片補課"]].forEach(function(t){
+    var d=el("div","tile "+t[0]); d.appendChild(el("b",null,String(t[1])));
+    d.appendChild(el("span",null,t[2])); tiles.appendChild(d);
+  });
+
+  var byC={};
+  rs.forEach(function(r){
+    var k=r.className||className(r.classId);
+    byC[k]=byC[k]||{total:0,open:0,cls:0,vid:0};
+    byC[k].total++;
+    var s=statusOf(r);
+    if(s==="class") byC[k].cls++; else if(s==="video") byC[k].vid++; else byC[k].open++;
+  });
+  buildTable($("tblClass"),["班級","請假","待補","實體補課","影片補課"],
+    Object.keys(byC).sort().map(function(k){ return [k,byC[k].total,byC[k].open,byC[k].cls,byC[k].vid]; }),
+    "此範圍沒有紀錄");
+
+  var byS={};
+  rs.forEach(function(r){
+    var k=r.studentName+"｜"+(r.className||className(r.classId));
+    byS[k]=byS[k]||{total:0,open:0}; byS[k].total++; if(!r.makeupType) byS[k].open++;
+  });
+  buildTable($("tblStudent"),["學生","班級","請假","待補"],
+    Object.keys(byS).map(function(k){ return [k.split("｜")[0],k.split("｜")[1],byS[k].total,byS[k].open]; })
+      .sort(function(a,b){ return b[2]-a[2]||b[3]-a[3]; }).slice(0,10),
+    "此範圍沒有紀錄");
+
+  var sf=$("recStatus"); sf.innerHTML="";
+  [["all","全部"],["open","未補完"],["class","實體補課"],["video","補課系統影片"]].forEach(function(o){
+    var b=el("button","chip tab",o[1]); b.type="button";
+    b.setAttribute("aria-pressed", S.recStatus===o[0]?"true":"false");
+    b.onclick=function(){ S.recStatus=o[0]; renderRec(); };
+    sf.appendChild(b);
+  });
+  var list=rs.filter(function(r){
+    if(S.recStatus==="all") return true;
+    if(S.recStatus==="open") return !r.makeupType;
+    return statusOf(r)===S.recStatus;
+  }).sort(function(a,b){ return a.absentDate<b.absentDate?1:-1; });
+  $("recCount").textContent=list.length+" 筆";
+  var box=$("recList"); box.innerHTML="";
+  if(!list.length){ box.appendChild(el("div","empty","這個範圍沒有符合的紀錄。")); return; }
+  list.slice(0,200).forEach(function(r){ box.appendChild(cardFor(r)); });
+  if(list.length>200) box.appendChild(el("div","empty","只顯示最新 200 筆，完整資料請匯出 CSV。"));
+}
+
+/* ---------- 匯出 ---------- */
+function csvCell(v){ v=String(v==null?"":v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+function exportCSV(){
+  var rs=filteredRecords().sort(function(a,b){ return a.absentDate<b.absentDate?-1:1; });
+  if(!rs.length){ toast("這個範圍沒有可匯出的資料"); return; }
+  var lines=[["班級","學生","缺課日期","事由","缺課單元","狀態","補課方式","補課日期","備註"].join(",")];
+  rs.forEach(function(r){
+    lines.push([r.className||className(r.classId), r.studentName, r.absentDate, r.reason||"", r.unit||"",
+      LABEL[statusOf(r)], r.makeupType==="video"?"補課系統影片":(r.makeupType==="class"?"實體補課":""),
+      r.makeupDate||"", r.note||""].map(csvCell).join(","));
+  });
+  var blob=new Blob(["﻿"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="補課紀錄_"+($("recMonth").value||today())+".csv";
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
+  toast("已匯出");
+}
+
+/* ---------- 對話框 ---------- */
+function openSheetRaw(title, build){
+  $("sheetTitle").textContent=title;
+  var body=$("sheetBody"); body.innerHTML=""; build(body);
+  $("scrim").hidden=false;
+}
+function closeSheet(){ $("scrim").hidden=true; }
+$("scrim").addEventListener("click", function(e){ if(e.target===this) closeSheet(); });
+document.addEventListener("keydown", function(e){ if(e.key==="Escape") closeSheet(); });
+
+function askText(title,labelText,value,onOk){
+  openSheetRaw(title, function(body){
+    var l=el("label","f"); l.appendChild(el("span",null,labelText));
+    var inp=el("input"); inp.type="text"; inp.value=value||"";
+    l.appendChild(inp); body.appendChild(l);
+    var ok=el("button","btn wide","儲存");
+    ok.onclick=function(){ var v=inp.value.trim(); if(!v){ toast("名稱不能空白"); return; } closeSheet(); onOk(v); };
+    inp.onkeydown=function(e){ if(e.key==="Enter"){ e.preventDefault(); ok.click(); } };
+    var no=el("button","btn ghost wide","取消"); no.onclick=closeSheet;
+    body.appendChild(ok); body.appendChild(no);
+    setTimeout(function(){ inp.focus(); inp.select(); },60);
+  });
+}
+function askConfirm(title,msg,okText,onOk){
+  openSheetRaw(title, function(body){
+    body.appendChild(el("p","hint",msg));
+    var ok=el("button","btn wide danger", okText||"確定");
+    ok.onclick=function(){ closeSheet(); onOk(); };
+    var no=el("button","btn ghost wide","取消"); no.onclick=closeSheet;
+    body.appendChild(ok); body.appendChild(no);
+  });
+}
+function openSheet(r){
+  openSheetRaw("編輯紀錄", function(body){
+    function field(t,node){ var l=el("label","f"); l.appendChild(el("span",null,t)); l.appendChild(node); return l; }
+    var dAbs=el("input"); dAbs.type="date"; dAbs.value=r.absentDate;
+    var selR=el("select");
+    ["","病假","事假","公假","家庭因素","其他"].forEach(function(o){ selR.appendChild(new Option(o||"未填",o)); });
+    selR.value=r.reason||"";
+    var unit=el("input"); unit.type="text"; unit.value=r.unit||"";
+    var note=el("textarea"); note.value=r.note||"";
+    var selM=el("select");
+    [["","尚未補課"],["class","實體補課"],["video","補課系統影片"]].forEach(function(o){ selM.appendChild(new Option(o[1],o[0])); });
+    selM.value=r.makeupType||"";
+    var dMk=el("input"); dMk.type="date"; dMk.value=r.makeupDate||"";
+
+    body.appendChild(el("p","hint", r.studentName+"　"+(r.className||className(r.classId))));
+    body.appendChild(field("缺課日期",dAbs));
+    var row=el("div","row"); row.appendChild(field("事由",selR)); row.appendChild(field("缺課單元",unit));
+    body.appendChild(row);
+    body.appendChild(field("備註",note));
+    var row2=el("div","row"); row2.appendChild(field("補課方式",selM)); row2.appendChild(field("補課日期",dMk));
+    body.appendChild(row2);
+    var save=el("button","btn wide","儲存");
+    save.onclick=function(){
+      r.absentDate=dAbs.value||r.absentDate; r.reason=selR.value; r.unit=unit.value.trim(); r.note=note.value.trim();
+      r.makeupType=selM.value||"";
+      r.makeupDate=r.makeupType ? (dMk.value||today()) : "";
+      put("records",r); closeSheet(); toast("已更新");
+    };
+    var cancel=el("button","btn ghost wide","取消"); cancel.onclick=closeSheet;
+    body.appendChild(save); body.appendChild(cancel);
+  });
+}
+
+/* ---------- 設定 ---------- */
+function renderSet(){
+  var cl=$("classList"); cl.innerHTML="";
+  if(!S.classes.length) cl.appendChild(el("p","hint","還沒有班級，先在下面新增一個。"));
+  S.classes.forEach(function(c){
+    var row=el("div","listrow");
+    row.appendChild(el("span","nm",c.name));
+    row.appendChild(el("span","qty", S.students.filter(function(s){return s.classId===c.id;}).length+" 人"));
+    var ren=el("button","linkbtn","改名");
+    ren.onclick=function(){
+      askText("班級改名","班級名稱",c.name,function(v){
+        var t=null; S.classes.forEach(function(x){ if(x.id===c.id) t=x; });
+        if(!t) return;
+        t.name=v; put("classes",t);
+        S.records.forEach(function(r){ if(r.classId===c.id && r.className!==v){ r.className=v; put("records",r); } });
+        toast("已改名");
+      });
+    };
+    var del=el("button","linkbtn","刪除");
+    del.onclick=function(){
+      askConfirm("刪除班級","確定刪除「"+c.name+"」？該班的學生名單會一併移除，已建立的請假紀錄會保留。","刪除班級",function(){
+        S.students.filter(function(s){ return s.classId===c.id; }).forEach(function(s){ drop("students",s.id); });
+        drop("classes",c.id); toast("已刪除班級");
+      });
+    };
+    row.appendChild(ren); row.appendChild(del); cl.appendChild(row);
+  });
+
+  var sel=$("setClass"), keep=sel.value; sel.innerHTML="";
+  S.classes.forEach(function(c){ sel.appendChild(new Option(c.name,c.id)); });
+  if(keep && S.classes.some(function(c){return c.id===keep;})) sel.value=keep;
+
+  var sl=$("studentList"); sl.innerHTML="";
+  var list=S.students.filter(function(s){ return s.classId===sel.value; })
+    .sort(function(a,b){ return String(a.name).localeCompare(String(b.name),"zh-Hant"); });
+  if(!list.length) sl.appendChild(el("p","hint","這個班級還沒有學生。"));
+  list.forEach(function(s){
+    var row=el("div","listrow");
+    row.appendChild(el("span","nm",s.name));
+    var open=S.records.filter(function(r){ return r.studentId===s.id && !r.makeupType; }).length;
+    row.appendChild(el("span","qty", open? open+" 筆待補":""));
+    var ren=el("button","linkbtn","改名");
+    ren.onclick=function(){
+      askText("學生改名","姓名",s.name,function(v){
+        var t=null; S.students.forEach(function(x){ if(x.id===s.id) t=x; });
+        if(!t) return;
+        t.name=v; put("students",t);
+        S.records.forEach(function(r){ if(r.studentId===s.id && r.studentName!==v){ r.studentName=v; put("records",r); } });
+        toast("已改名");
+      });
+    };
+    var del=el("button","linkbtn","移除");
+    del.onclick=function(){
+      askConfirm("移除學生","從名單移除「"+s.name+"」？已建立的請假紀錄會保留。","移除",function(){
+        drop("students",s.id); toast("已移除");
+      });
+    };
+    row.appendChild(ren); row.appendChild(del); sl.appendChild(row);
+  });
+
+  if(document.activeElement!==$("syncUrl")) $("syncUrl").value=S.url;
+}
+function doSeed(){
+  var cid=uid();
+  put("classes",{id:cid, name:"示範班級（可刪除）", createdAt:nowISO()});
+  var names=["示範－王小明","示範－陳美美","示範－林大衛"], ids=[];
+  names.forEach(function(n){ var i=uid(); ids.push(i); put("students",{id:i, classId:cid, name:n, createdAt:nowISO()}); });
+  var d=new Date(); d.setDate(d.getDate()-9);
+  var past=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+  put("records",{id:uid(), studentId:ids[0], studentName:names[0], classId:cid, className:"示範班級（可刪除）",
+    absentDate:past, reason:"病假", unit:"MJ12 U3", note:"示範資料", makeupType:"", makeupDate:"", createdAt:nowISO()});
+  put("records",{id:uid(), studentId:ids[1], studentName:names[1], classId:cid, className:"示範班級（可刪除）",
+    absentDate:today(), reason:"事假", unit:"MJ12 U4", note:"示範資料", makeupType:"video", makeupDate:today(), createdAt:nowISO()});
+  toast("示範資料已建立"); go("todo");
+}
+
+/* ---------- 導覽 ---------- */
+function go(v){
+  S.view=v;
+  ["log","todo","rec","set"].forEach(function(k){ $("v-"+k).classList.toggle("on", k===v); });
+  document.querySelectorAll(".nav button").forEach(function(b){
+    b.setAttribute("aria-current", b.dataset.go===v ? "true":"false");
+  });
+  window.scrollTo(0,0);
+  renderAll();
+}
+document.querySelectorAll(".nav button").forEach(function(b){ b.onclick=function(){ go(b.dataset.go); }; });
+
+function renderAll(){
+  $("badgeTodo").textContent=String(S.records.filter(function(r){ return !r.makeupType; }).length);
+  $("badgeRec").textContent=String(S.records.length);
+  if(S.view==="log") renderLog();
+  if(S.view==="todo") renderTodo();
+  if(S.view==="rec") renderRec();
+  if(S.view==="set") renderSet();
+}
+
+/* ---------- 事件 ---------- */
+$("logClass").onchange=function(){ S.logPicked={}; renderLog(); };
+$("logSubmit").onclick=submitLog;
+$("recClass").onchange=renderRec;
+$("recMonth").onchange=renderRec;
+$("exportBtn").onclick=exportCSV;
+$("setClass").onchange=renderSet;
+$("seedBtn").onclick=function(){
+  askConfirm("建立示範資料","會建立一個「示範班級」與三位範例學生、兩筆紀錄，讓你先試用流程。之後在班級列表直接刪除即可。","建立",doSeed);
+};
+$("addClass").onclick=function(){
+  var v=$("newClass").value.trim();
+  if(!v){ toast("請輸入班級名稱"); return; }
+  put("classes",{id:uid(), name:v, createdAt:nowISO()});
+  $("newClass").value=""; toast("已新增班級");
+};
+$("addStudents").onclick=function(){
+  var cid=$("setClass").value;
+  if(!cid){ toast("請先建立並選擇班級"); return; }
+  var names=$("newStudents").value.split("\n").map(function(s){ return s.trim(); }).filter(Boolean);
+  if(!names.length){ toast("請輸入至少一位學生"); return; }
+  names.forEach(function(n){ put("students",{id:uid(), classId:cid, name:n, createdAt:nowISO()}); });
+  $("newStudents").value=""; toast("已加入 "+names.length+" 位學生");
+};
+$("saveSync").onclick=function(){
+  var u=$("syncUrl").value.trim();
+  if(u && !/^https:\/\/script\.google\.com\/.*\/exec/.test(u)){
+    toast("網址看起來不對，應該是 script.google.com 結尾 /exec"); return;
+  }
+  S.url=u;
+  try{ localStorage.setItem(LS_URL,u); }catch(e){}
+  if(u){ toast("已儲存，開始同步"); sync(true); } else { setSync("local","本機模式"); toast("已改為只存本機"); }
+};
+$("syncNow").onclick=function(){ if(!S.url){ toast("請先填入 Apps Script 網址"); return; } sync(true); };
+$("copyCode").onclick=function(){
+  var ta=$("gsCode");
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(ta.value).then(function(){ toast("程式碼已複製"); },
+      function(){ ta.focus(); ta.select(); toast("請手動複製"); });
+  } else { ta.focus(); ta.select(); toast("請手動複製"); }
+};
+document.addEventListener("visibilitychange", function(){ if(!document.hidden && S.url) sync(); });
+window.addEventListener("online", function(){ if(S.url) sync(); });
+
+/* ---------- 啟動 ---------- */
+loadLocal();
+$("logDate").value=today();
+$("recMonth").value=thisMonth();
+setSync(S.url?"ok":"local", S.url?"連線中…":"本機模式");
+go("todo");
+if(S.url) sync();
+setInterval(function(){ if(S.url && !document.hidden) sync(); }, 60000);
+})();
+</script>
+</body>
+</html>
