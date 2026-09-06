@@ -262,6 +262,25 @@ ol.steps li{margin-bottom:4px}
       <button class="btn ghost" id="addStudents">加入名單</button>
     </div>
 
+    <div class="sec-title">整批匯入名單</div>
+    <div class="panel stack">
+      <button class="btn" id="fileBtn">匯入點名表檔案（Excel / CSV）</button>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.tsv,.txt" hidden>
+      <p class="hint">直接選擇你的點名表。可以選姓名在哪一欄、班級用哪一欄或用工作表名稱，匯入前會先預覽。</p>
+      <details class="more">
+        <summary>或直接貼上名單</summary>
+        <div class="stack">
+      <textarea id="bulkText" style="min-height:150px" placeholder="七年A班&#10;王小明&#10;陳美美&#10;&#10;七年B班&#10;林大衛"></textarea>
+      <button class="btn ghost" id="bulkBtn">解析並匯入</button>
+      <p class="hint">
+        <b>格式一</b>　一個班級一段：每段第一行是班級名稱，下面一行一位學生，段落之間空一行。<br>
+        <b>格式二</b>　從 Excel 或試算表直接複製兩欄：左欄班級、右欄姓名（逗號或 Tab 分隔皆可，標題列會自動略過）。<br>
+        已存在的班級會沿用，重複的姓名自動略過。
+      </p>
+        </div>
+      </details>
+    </div>
+
     <div class="sec-title">雲端同步 <span class="count" id="syncState"></span></div>
     <div class="panel stack">
       <label class="f"><span>Google Apps Script 網址</span>
@@ -386,6 +405,7 @@ function doPost(e){
 </div>
 <div class="toast" id="toast" hidden></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 (function(){
 "use strict";
@@ -862,6 +882,249 @@ function doSeed(){
   toast("示範資料已建立"); go("todo");
 }
 
+/* ---------- 名單匯入 ---------- */
+function addRoster(blocks){
+  var newCls=0, newStu=0, dup=0;
+  blocks.forEach(function(b){
+    var cname=String(b.cls||"").trim();
+    if(!cname || !b.names.length) return;
+    var c=null;
+    S.classes.forEach(function(x){ if(x.name===cname) c=x; });
+    if(!c){ c={id:uid(), name:cname, createdAt:nowISO()}; put("classes",c); newCls++; }
+    var have={};
+    S.students.forEach(function(s){ if(s.classId===c.id) have[s.name]=1; });
+    b.names.forEach(function(n){
+      n=String(n).trim();
+      if(!n) return;
+      if(have[n]){ dup++; return; }
+      have[n]=1; newStu++;
+      put("students",{id:uid(), classId:c.id, name:n, createdAt:nowISO()});
+    });
+  });
+  toast("匯入完成："+newStu+" 位學生"+(newCls?"、"+newCls+" 個新班級":"")+(dup?"（略過 "+dup+" 位重複）":""));
+  renderAll();
+}
+function parseRoster(text){
+  var lines=String(text).replace(/\r/g,"").split("\n");
+  var out=[];
+  if(lines.some(function(l){ return /[\t,，]/.test(l); })){
+    var map={}, order=[];
+    lines.forEach(function(l,i){
+      l=l.trim(); if(!l) return;
+      var p=l.split(/[\t,，]+/).map(function(x){ return x.trim(); }).filter(Boolean);
+      if(p.length<2) return;
+      if(i===0 && /班|class/i.test(p[0]) && /姓名|學生|name/i.test(p[1])) return;
+      if(!map[p[0]]){ map[p[0]]=[]; order.push(p[0]); }
+      map[p[0]].push(p[1]);
+    });
+    order.forEach(function(c){ out.push({cls:c, names:map[c]}); });
+  } else {
+    var cur=null;
+    lines.forEach(function(l){
+      l=l.trim();
+      if(!l){ cur=null; return; }
+      if(!cur){ cur={cls:l, names:[]}; out.push(cur); }
+      else cur.names.push(l);
+    });
+    out=out.filter(function(b){ return b.names.length; });
+  }
+  return out;
+}
+
+var HEADERS=/^(姓\s*名|學生|學生姓名|名字|名單|座號|學號|編號|序號|班級|班別|組別|備註|日期|出席|簽到|性別|電話|家長|name|student|no\.?|id|class)$/i;
+function isHeaderish(v){ return HEADERS.test(String(v==null?"":v).trim()); }
+function isName(v){
+  v=String(v==null?"":v).trim();
+  if(!v || /^\d+$/.test(v) || isHeaderish(v)) return false;
+  return /^[一-鿿·．ㄅ-ㄩ]{2,5}$/.test(v) || /^[A-Za-z][A-Za-z .'-]{1,24}$/.test(v);
+}
+function colLabel(i){
+  var s="";
+  do{ s=String.fromCharCode(65+(i%26))+s; i=Math.floor(i/26)-1; }while(i>=0);
+  return s;
+}
+function colCount(rows){ var m=0; rows.forEach(function(r){ if(r.length>m) m=r.length; }); return m; }
+function guessNameCol(rows){
+  var n=colCount(rows), best=0, bestScore=-1;
+  for(var c=0;c<n;c++){
+    var score=0;
+    rows.forEach(function(r){ if(isName(r[c])) score++; });
+    if(score>bestScore){ bestScore=score; best=c; }
+  }
+  return best;
+}
+function guessStart(rows,col){
+  for(var i=0;i<rows.length;i++) if(isName(rows[i][col])) return i;
+  return 0;
+}
+function parseCSV(text,sep){
+  var rows=[], row=[], cur="", q=false;
+  text=text.replace(/\r\n/g,"\n").replace(/\r/g,"\n");
+  for(var i=0;i<text.length;i++){
+    var ch=text[i];
+    if(q){
+      if(ch==='"'){ if(text[i+1]==='"'){ cur+='"'; i++; } else q=false; }
+      else cur+=ch;
+    } else if(ch==='"'){ q=true; }
+    else if(ch===sep){ row.push(cur); cur=""; }
+    else if(ch==="\n"){ row.push(cur); rows.push(row); row=[]; cur=""; }
+    else cur+=ch;
+  }
+  if(cur!=="" || row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(function(r){ return r.some(function(c){ return String(c).trim()!==""; }); });
+}
+async function readSheetFile(file){
+  var nm=file.name.toLowerCase();
+  var ab=await file.arrayBuffer();
+  if(/\.(csv|tsv|txt)$/.test(nm)){
+    var text;
+    try{ text=new TextDecoder("utf-8",{fatal:true}).decode(ab); }
+    catch(e){
+      try{ text=new TextDecoder("big5").decode(ab); }
+      catch(e2){ text=new TextDecoder("utf-8").decode(ab); }
+    }
+    var sep = (nm.slice(-4)===".tsv" || text.indexOf("\t")>=0) ? "\t" : ",";
+    return [{name:file.name.replace(/\.[^.]+$/,""), rows:parseCSV(text,sep)}];
+  }
+  if(!window.XLSX) throw new Error("xlsx-missing");
+  var wb=XLSX.read(ab,{type:"array"});
+  return wb.SheetNames.map(function(n){
+    return {name:n, rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1, blankrows:false, defval:""})};
+  }).filter(function(s){ return s.rows.length; });
+}
+
+function openImporter(sheets){
+  var st={ si:0, nameCol:0, start:0, mode:"custom", clsCol:0, clsName:"", useSheetNames:false };
+  function reguess(){
+    var rows=sheets[st.si].rows;
+    st.nameCol=guessNameCol(rows);
+    st.start=guessStart(rows, st.nameCol);
+    st.clsName=sheets[st.si].name;
+    if(sheets.length>1){ st.mode="sheet"; st.useSheetNames=true; }
+  }
+  reguess();
+
+  function build(body){
+    body.innerHTML="";
+    var rows=sheets[st.si].rows, ncol=colCount(rows);
+
+    if(sheets.length>1){
+      var l0=el("label","f"); l0.appendChild(el("span",null,"工作表（共 "+sheets.length+" 個）"));
+      var ss=el("select");
+      sheets.forEach(function(s,i){ ss.appendChild(new Option(s.name+"（"+s.rows.length+" 列）", String(i))); });
+      ss.value=String(st.si);
+      ss.onchange=function(){ st.si=Number(ss.value); reguess(); build(body); };
+      l0.appendChild(ss); body.appendChild(l0);
+    }
+
+    // 預覽
+    var wrap=el("div","tablewrap"); wrap.style.maxHeight="190px"; wrap.style.overflowY="auto";
+    var tb=el("table"), thead=el("thead"), htr=el("tr");
+    htr.appendChild(el("th",null,"列"));
+    for(var c=0;c<Math.min(ncol,8);c++) htr.appendChild(el("th",null,colLabel(c)));
+    thead.appendChild(htr); tb.appendChild(thead);
+    var tbody=el("tbody");
+    rows.slice(0,8).forEach(function(r,ri){
+      var tr=el("tr");
+      if(ri<st.start) tr.style.opacity=".38";
+      tr.appendChild(el("td",null,String(ri+1)));
+      for(var c=0;c<Math.min(ncol,8);c++){
+        var td=el("td",null,String(r[c]==null?"":r[c]).slice(0,14));
+        if(c===st.nameCol){ td.style.background="var(--accent-soft)"; td.style.fontWeight="700"; }
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    });
+    tb.appendChild(tbody); wrap.appendChild(tb); body.appendChild(wrap);
+
+    var row1=el("div","row");
+    var l1=el("label","f"); l1.appendChild(el("span",null,"姓名在哪一欄"));
+    var s1=el("select");
+    for(var c2=0;c2<ncol;c2++){
+      var sample="";
+      for(var k=st.start;k<rows.length && k<st.start+3;k++){
+        var v=String(rows[k][c2]==null?"":rows[k][c2]).trim();
+        if(v){ sample=v.slice(0,6); break; }
+      }
+      s1.appendChild(new Option(colLabel(c2)+(sample?"　"+sample:""), String(c2)));
+    }
+    s1.value=String(st.nameCol);
+    s1.onchange=function(){ st.nameCol=Number(s1.value); build(body); };
+    l1.appendChild(s1); row1.appendChild(l1);
+
+    var l2=el("label","f"); l2.appendChild(el("span",null,"從第幾列開始"));
+    var i2=el("input"); i2.type="text"; i2.inputMode="numeric"; i2.value=String(st.start+1);
+    i2.onchange=function(){ var v=parseInt(i2.value,10); st.start=isNaN(v)?0:Math.max(0,v-1); build(body); };
+    l2.appendChild(i2); row1.appendChild(l2);
+    body.appendChild(row1);
+
+    var l3=el("label","f"); l3.appendChild(el("span",null,"班級名稱怎麼來"));
+    var s3=el("select");
+    s3.appendChild(new Option("我自己輸入","custom"));
+    s3.appendChild(new Option("用表格裡的某一欄","col"));
+    if(sheets.length>1) s3.appendChild(new Option("用工作表名稱（每個工作表一個班級）","sheet"));
+    s3.value=st.mode;
+    s3.onchange=function(){ st.mode=s3.value; build(body); };
+    l3.appendChild(s3); body.appendChild(l3);
+
+    if(st.mode==="custom"){
+      var l4=el("label","f"); l4.appendChild(el("span",null,"班級名稱"));
+      var i4=el("input"); i4.type="text"; i4.value=st.clsName||sheets[st.si].name;
+      i4.oninput=function(){ st.clsName=i4.value; };
+      l4.appendChild(i4); body.appendChild(l4);
+    } else if(st.mode==="col"){
+      var l5=el("label","f"); l5.appendChild(el("span",null,"班級在哪一欄"));
+      var s5=el("select");
+      for(var c3=0;c3<ncol;c3++){
+        var sp="";
+        for(var k2=st.start;k2<rows.length && k2<st.start+3;k2++){
+          var v2=String(rows[k2][c3]==null?"":rows[k2][c3]).trim();
+          if(v2){ sp=v2.slice(0,6); break; }
+        }
+        s5.appendChild(new Option(colLabel(c3)+(sp?"　"+sp:""), String(c3)));
+      }
+      s5.value=String(st.clsCol);
+      s5.onchange=function(){ st.clsCol=Number(s5.value); };
+      l5.appendChild(s5); body.appendChild(l5);
+    }
+
+    var blocks=collect();
+    var total=0; blocks.forEach(function(b){ total+=b.names.length; });
+    body.appendChild(el("p","hint","將匯入 "+blocks.length+" 個班級、"+total+" 位學生。"+
+      (st.mode==="sheet" ? "每個工作表會建立一個同名班級。" : "")));
+
+    var ok=el("button","btn wide", total? "匯入 "+total+" 位學生" : "沒有可匯入的資料");
+    ok.disabled=!total;
+    ok.onclick=function(){ closeSheet(); addRoster(blocks); };
+    var no=el("button","btn ghost wide","取消"); no.onclick=closeSheet;
+    body.appendChild(ok); body.appendChild(no);
+  }
+
+  function fromSheet(sh, cname){
+    var names=[], out=[], map={}, order=[];
+    sh.rows.slice(st.start).forEach(function(r){
+      var n=String(r[st.nameCol]==null?"":r[st.nameCol]).trim();
+      if(!n || /^\d+$/.test(n) || isHeaderish(n)) return;
+      var c = st.mode==="col" ? String(r[st.clsCol]==null?"":r[st.clsCol]).trim() : cname;
+      if(!c) return;
+      if(!map[c]){ map[c]=[]; order.push(c); }
+      if(map[c].indexOf(n)<0) map[c].push(n);
+    });
+    order.forEach(function(c){ out.push({cls:c, names:map[c]}); });
+    return out;
+  }
+  function collect(){
+    if(st.mode==="sheet"){
+      var all=[];
+      sheets.forEach(function(sh){ all=all.concat(fromSheet(sh, sh.name)); });
+      return all;
+    }
+    return fromSheet(sheets[st.si], st.mode==="custom" ? (st.clsName||sheets[st.si].name) : "");
+  }
+
+  openSheetRaw("匯入點名表", build);
+}
+
 /* ---------- 導覽 ---------- */
 function go(v){
   S.view=v;
@@ -906,6 +1169,31 @@ $("addStudents").onclick=function(){
   if(!names.length){ toast("請輸入至少一位學生"); return; }
   names.forEach(function(n){ put("students",{id:uid(), classId:cid, name:n, createdAt:nowISO()}); });
   $("newStudents").value=""; toast("已加入 "+names.length+" 位學生");
+};
+$("bulkBtn").onclick=function(){
+  var blocks=parseRoster($("bulkText").value);
+  if(!blocks.length){ toast("看不出格式，請參考下方說明"); return; }
+  var total=0; blocks.forEach(function(b){ total+=b.names.length; });
+  askConfirm("確認匯入","解析出 "+blocks.length+" 個班級、"+total+" 位學生，確定匯入？","匯入", function(){
+    addRoster(blocks); $("bulkText").value="";
+  });
+};
+$("fileBtn").onclick=function(){ $("fileInput").click(); };
+$("fileInput").onchange=async function(){
+  var f=this.files && this.files[0];
+  this.value="";
+  if(!f) return;
+  var btn=$("fileBtn"); btn.disabled=true; btn.textContent="讀取中…";
+  try{
+    var sheets=await readSheetFile(f);
+    if(!sheets.length){ toast("檔案裡沒有資料"); }
+    else openImporter(sheets);
+  }catch(e){
+    toast(String(e && e.message)==="xlsx-missing"
+      ? "Excel 讀取元件載入失敗，請確認有網路後重新整理"
+      : "檔案讀不出來，請改存成 CSV 或 xlsx 再試");
+  }
+  btn.disabled=false; btn.textContent="匯入點名表檔案（Excel / CSV）";
 };
 $("saveSync").onclick=function(){
   var u=$("syncUrl").value.trim();
