@@ -68,10 +68,14 @@ img{max-width:100%}
 label.f{display:flex; flex-direction:column; gap:6px;}
 label.f > span{font-size:12px; font-weight:500; color:var(--ink-2); letter-spacing:.03em;}
 input,select,textarea,button{font-family:inherit; font-size:15px;}
-input[type=text],input[type=url],input[type=date],input[type=month],select,textarea{
+input[type=text],input[type=url],input[type=date],input[type=month],input[type=time],select,textarea{
   width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:9px;
   background:var(--surface); color:var(--ink); appearance:none;}
-input[type=date],input[type=month]{font-family:var(--mono); font-size:14px;}
+input[type=date],input[type=month],input[type=time]{font-family:var(--mono); font-size:14px;}
+.lesson{display:flex; gap:7px; align-items:center;}
+.lesson select{padding:9px 10px; font-size:14px;}
+.lesson .no{font-family:var(--mono); font-size:12px; color:var(--ink-3); flex:0 0 auto; width:22px;}
+.lesson .rm{flex:0 0 auto; color:var(--ink-3); font-size:18px; line-height:1; padding:4px 6px;}
 textarea{resize:vertical; min-height:64px; line-height:1.55;}
 input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,.chip:focus-visible{
   outline:2px solid var(--accent); outline-offset:2px;}
@@ -108,6 +112,7 @@ details.more .stack{margin-top:12px}
 .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
   padding:13px 14px; box-shadow:var(--shadow); border-left:3px solid var(--line);}
 .card.s-pending{border-left-color:var(--warn)} .card.s-late{border-left-color:var(--bad)}
+.card.s-booked{border-left-color:var(--accent)}
 .card.s-class{border-left-color:var(--ok)} .card.s-video{border-left-color:var(--video)}
 .card-head{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;}
 .who{font-size:16px; font-weight:700; letter-spacing:.02em;}
@@ -119,6 +124,8 @@ details.more .stack{margin-top:12px}
   padding:3px 9px; border-radius:999px; white-space:nowrap;}
 .p-pending{background:var(--warn-soft); color:var(--warn)}
 .p-late{background:var(--bad-soft); color:var(--bad)}
+.p-booked{background:var(--accent-soft); color:var(--accent)}
+.act-book{background:var(--accent-soft); color:var(--accent); font-weight:700;}
 .p-class{background:var(--ok-soft); color:var(--ok)}
 .p-video{background:var(--video-soft); color:var(--video)}
 .acts{display:flex; gap:7px; margin-top:11px; flex-wrap:wrap;}
@@ -132,12 +139,13 @@ details.more .stack{margin-top:12px}
 .empty{text-align:center; padding:34px 18px; color:var(--ink-3); font-size:14px;
   border:1px dashed var(--line); border-radius:var(--radius); line-height:1.7;}
 
-.tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
+.tiles{display:grid; grid-template-columns:repeat(5,1fr); gap:6px;}
 .tile{background:var(--surface); border:1px solid var(--line); border-radius:10px;
-  padding:11px 8px; text-align:center;}
-.tile b{display:block; font-family:var(--mono); font-size:21px; font-weight:500; line-height:1.25;}
-.tile span{font-size:11px; color:var(--ink-3); letter-spacing:.04em;}
+  padding:11px 4px; text-align:center;}
+.tile b{display:block; font-family:var(--mono); font-size:20px; font-weight:500; line-height:1.25;}
+.tile span{font-size:10.5px; color:var(--ink-3); letter-spacing:0;}
 .tile.t-pending b{color:var(--warn)} .tile.t-late b{color:var(--bad)}
+.tile.t-booked b{color:var(--accent)}
 .tile.t-class b{color:var(--ok)} .tile.t-video b{color:var(--video)}
 
 .tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface);}
@@ -198,24 +206,27 @@ ol.steps li{margin-bottom:4px}
         <div class="picker" id="logStudents"></div>
       </div>
       <label class="f"><span>缺課日期</span><input type="date" id="logDate"></label>
+      <div>
+        <div class="sec-title" style="margin:2px 0 8px">缺課堂數
+          <button class="linkbtn" id="addLesson">＋ 再加一堂</button>
+        </div>
+        <div class="stack" id="lessonRows"></div>
+      </div>
       <details class="more">
         <summary>補充內容（選填）</summary>
         <div class="stack">
-          <div class="row">
-            <label class="f"><span>事由</span>
-              <select id="logReason">
-                <option value="">未填</option>
-                <option>病假</option><option>事假</option><option>公假</option>
-                <option>家庭因素</option><option>其他</option>
-              </select>
-            </label>
-            <label class="f"><span>缺課單元／進度</span><input type="text" id="logUnit" placeholder="例：MJ12 U3"></label>
-          </div>
+          <label class="f"><span>事由</span>
+            <select id="logReason">
+              <option value="">未填</option>
+              <option>病假</option><option>事假</option><option>公假</option>
+              <option>家庭因素</option><option>其他</option>
+            </select>
+          </label>
           <label class="f"><span>備註</span><textarea id="logNote" placeholder="例：家長已來電，下週三可補"></textarea></label>
         </div>
       </details>
       <button class="btn wide" id="logSubmit">登記請假</button>
-      <p class="hint">可一次點選多位學生，同一天的缺課會一起建立紀錄。登記後到「待補」標記補課方式。</p>
+      <p class="hint">可一次點選多位學生。缺課兩堂就按「再加一堂」，送出後會拆成兩筆各自獨立的紀錄。</p>
     </div>
   </section>
 
@@ -308,8 +319,9 @@ ol.steps li{margin-bottom:4px}
 const SHEETS = {
   classes:  ['id','name','createdAt','updatedAt','deleted'],
   students: ['id','classId','name','createdAt','updatedAt','deleted'],
-  records:  ['id','studentId','studentName','classId','className','absentDate',
-             'reason','unit','note','makeupType','makeupDate','createdAt','updatedAt','deleted']
+  records:  ['id','studentId','studentName','classId','className','absentDate','reason',
+             'book','unitNo','progress','unit','note','planDate','planTime',
+             'makeupType','makeupDate','createdAt','updatedAt','deleted']
 };
 
 function sh_(name){
@@ -412,7 +424,8 @@ function doPost(e){
 
 var S = { classes:[], students:[], records:[], tomb:{}, queue:[],
           view:"todo", url:"", syncing:false, lastSync:"", syncErr:"",
-          logPicked:{}, todoClass:"", recStatus:"all" };
+          logPicked:{}, todoClass:"", recStatus:"all",
+          lessons:[{book:"",unitNo:"",progress:""}] };
 var LS="mt-data-v2", LS_URL="mt-url-v2";
 
 function $(id){ return document.getElementById(id); }
@@ -428,9 +441,23 @@ function dayDiff(a,b){ return Math.round((new Date(b+"T00:00:00")-new Date(a+"T0
 function statusOf(r){
   if(r.makeupType==="class") return "class";
   if(r.makeupType==="video") return "video";
+  if(r.planDate) return dayDiff(r.planDate, today())>0 ? "late" : "booked";
   return dayDiff(r.absentDate, today())>14 ? "late" : "pending";
 }
-var LABEL={pending:"待補課", late:"逾期未補", "class":"實體補課", video:"補課系統影片"};
+var LABEL={pending:"待安排", booked:"已約補課", late:"逾期未補", "class":"實體補課", video:"補課系統影片"};
+
+var BOOKS={ MJ:16, TJ:8 };
+var PROGRESS_MAX=28;
+function unitText(r){
+  var s = r.book ? (r.book + (r.unitNo||"")) : "";
+  if(r.progress) s += (s ? " " : "") + "U" + r.progress;
+  if(!s && r.unit) return String(r.unit);
+  return s;
+}
+function planText(r){
+  if(!r.planDate) return "";
+  return r.planDate + (r.planTime ? " "+r.planTime : "");
+}
 function className(id){ for(var i=0;i<S.classes.length;i++) if(S.classes[i].id===id) return S.classes[i].name; return "未分班"; }
 
 /* ---------- 本機儲存 ---------- */
@@ -559,20 +586,69 @@ function renderLog(){
   }
   var n=Object.keys(S.logPicked).length;
   $("logSelCount").textContent = n ? "已選 "+n+" 位" : "未選";
+  renderLessons();
+}
+
+function lessonPicker(L, idx){
+  var wrap=el("div","lesson");
+  wrap.appendChild(el("span","no", "第"+(idx+1)+"堂"));
+
+  var bs=el("select");
+  bs.appendChild(new Option("教材",""));
+  Object.keys(BOOKS).forEach(function(b){ bs.appendChild(new Option(b,b)); });
+  bs.value=L.book||"";
+  bs.onchange=function(){ L.book=bs.value; L.unitNo=""; renderLessons(); };
+  wrap.appendChild(bs);
+
+  var us=el("select");
+  us.appendChild(new Option("級數",""));
+  if(L.book) for(var i=1;i<=BOOKS[L.book];i++) us.appendChild(new Option((L.book||"")+i, String(i)));
+  us.value=L.unitNo||"";
+  us.disabled=!L.book;
+  us.onchange=function(){ L.unitNo=us.value; };
+  wrap.appendChild(us);
+
+  var ps=el("select");
+  ps.appendChild(new Option("單元",""));
+  for(var j=1;j<=PROGRESS_MAX;j++) ps.appendChild(new Option("U"+j, String(j)));
+  ps.value=L.progress||"";
+  ps.onchange=function(){ L.progress=ps.value; };
+  wrap.appendChild(ps);
+
+  if(S.lessons.length>1){
+    var rm=el("button","rm","×"); rm.type="button"; rm.title="移除這堂";
+    rm.onclick=function(){ S.lessons.splice(idx,1); renderLessons(); };
+    wrap.appendChild(rm);
+  }
+  return wrap;
+}
+function renderLessons(){
+  var box=$("lessonRows");
+  if(!box) return;
+  box.innerHTML="";
+  S.lessons.forEach(function(L,i){ box.appendChild(lessonPicker(L,i)); });
 }
 function submitLog(){
   var ids=Object.keys(S.logPicked);
   if(!ids.length){ toast("請先選擇學生"); return; }
   var date=$("logDate").value||today(), cid=$("logClass").value;
+  var lessons=S.lessons.slice();
+  if(!lessons.length) lessons=[{book:"",unitNo:"",progress:""}];
+  var made=0;
   ids.forEach(function(sid){
     var st=null; S.students.forEach(function(x){ if(x.id===sid) st=x; });
-    put("records",{ id:uid(), studentId:sid, studentName:st?st.name:"（已刪除）",
-      classId:cid, className:className(cid), absentDate:date,
-      reason:$("logReason").value, unit:$("logUnit").value.trim(), note:$("logNote").value.trim(),
-      makeupType:"", makeupDate:"", createdAt:nowISO() });
+    lessons.forEach(function(L){
+      made++;
+      put("records",{ id:uid(), studentId:sid, studentName:st?st.name:"（已刪除）",
+        classId:cid, className:className(cid), absentDate:date,
+        reason:$("logReason").value, book:L.book||"", unitNo:L.unitNo||"", progress:L.progress||"",
+        unit:"", note:$("logNote").value.trim(),
+        planDate:"", planTime:"", makeupType:"", makeupDate:"", createdAt:nowISO() });
+    });
   });
-  toast("已登記 "+ids.length+" 筆");
-  S.logPicked={}; $("logUnit").value=""; $("logNote").value=""; $("logReason").value="";
+  toast("已登記 "+made+" 筆（"+ids.length+" 位學生 × "+lessons.length+" 堂）");
+  S.logPicked={}; S.lessons=[{book:"",unitNo:"",progress:""}];
+  $("logNote").value=""; $("logReason").value="";
   go("todo");
 }
 
@@ -588,17 +664,20 @@ function cardFor(r){
   var meta=el("div","meta");
   meta.appendChild(el("span",null,"缺課 "+r.absentDate));
   if(r.reason) meta.appendChild(el("span",null,r.reason));
-  if(r.unit) meta.appendChild(el("span",null,r.unit));
+  var ut=unitText(r); if(ut) meta.appendChild(el("span",null,ut));
   if(r.makeupType && r.makeupDate) meta.appendChild(el("span",null,(r.makeupType==="video"?"影片 ":"實體 ")+r.makeupDate));
-  if(!r.makeupType){ var g=dayDiff(r.absentDate, today()); if(g>0) meta.appendChild(el("span",null,"已過 "+g+" 天")); }
+  else if(r.planDate) meta.appendChild(el("span",null,"約 "+planText(r)));
+  if(!r.makeupType && !r.planDate){ var g=dayDiff(r.absentDate, today()); if(g>0) meta.appendChild(el("span",null,"已過 "+g+" 天")); }
   c.appendChild(meta);
   if(r.note) c.appendChild(el("div","note", r.note));
 
   if(!r.makeupType){
     var acts=el("div","acts");
+    var b0=el("button","btn sm act-book", r.planDate?"改補課時間":"約補課時間");
+    b0.onclick=function(){ bookMakeup(r); };
     var b1=el("button","btn sm act-ok","實體補課完成"); b1.onclick=function(){ complete(r,"class"); };
     var b2=el("button","btn sm act-video","已看補課影片"); b2.onclick=function(){ complete(r,"video"); };
-    acts.appendChild(b1); acts.appendChild(b2); c.appendChild(acts);
+    acts.appendChild(b0); acts.appendChild(b1); acts.appendChild(b2); c.appendChild(acts);
   }
   var foot=el("div","card-foot");
   var e1=el("button","linkbtn","編輯"); e1.onclick=function(){ openSheet(r); };
@@ -616,8 +695,35 @@ function cardFor(r){
   return c;
 }
 function complete(r,type){
-  r.makeupType=type; r.makeupDate=today(); put("records",r);
+  r.makeupType=type; r.makeupDate= r.planDate || today(); put("records",r);
   toast(type==="video"?"已記為補課系統影片":"已記為實體補課");
+}
+function bookMakeup(r){
+  openSheetRaw("預約補課時間", function(body){
+    body.appendChild(el("p","hint", r.studentName+"　"+(r.className||className(r.classId))+"　缺課 "+r.absentDate+
+      (unitText(r)?"　"+unitText(r):"")));
+    var row=el("div","row");
+    var l1=el("label","f"); l1.appendChild(el("span",null,"補課日期"));
+    var d=el("input"); d.type="date"; d.value=r.planDate||today();
+    l1.appendChild(d); row.appendChild(l1);
+    var l2=el("label","f"); l2.appendChild(el("span",null,"時間"));
+    var t=el("input"); t.type="time"; t.step="300"; t.value=r.planTime||"";
+    l2.appendChild(t); row.appendChild(l2);
+    body.appendChild(row);
+    body.appendChild(el("p","hint","存好後卡片會顯示「已約補課」，方便跟家長確認。時間到了再按「實體補課完成」或「已看補課影片」結案。"));
+    var ok=el("button","btn wide","儲存預約");
+    ok.onclick=function(){
+      r.planDate=d.value||""; r.planTime=r.planDate ? (t.value||"") : "";
+      put("records",r); closeSheet();
+      toast(r.planDate ? "已約 "+planText(r) : "已清除預約");
+    };
+    var clr=el("button","btn ghost wide","清除預約");
+    clr.onclick=function(){ r.planDate=""; r.planTime=""; put("records",r); closeSheet(); toast("已清除預約"); };
+    var no=el("button","btn ghost wide","取消"); no.onclick=closeSheet;
+    body.appendChild(ok);
+    if(r.planDate) body.appendChild(clr);
+    body.appendChild(no);
+  });
 }
 
 /* ---------- 待補 ---------- */
@@ -629,8 +735,14 @@ function renderTodo(){
     b.onclick=function(){ S.todoClass=o.id; renderTodo(); };
     f.appendChild(b);
   });
+  var rank={late:0, pending:1, booked:2};
   var list=S.records.filter(function(r){ return !r.makeupType && (!S.todoClass || r.classId===S.todoClass); })
-    .sort(function(a,b){ return a.absentDate<b.absentDate?-1:1; });
+    .sort(function(a,b){
+      var ra=rank[statusOf(a)], rb=rank[statusOf(b)];
+      if(ra!==rb) return ra-rb;
+      var da=a.planDate||a.absentDate, db=b.planDate||b.absentDate;
+      return da<db?-1:(da>db?1:0);
+    });
   $("todoCount").textContent = list.length ? list.length+" 筆" : "";
   var box=$("todoList"); box.innerHTML="";
   if(!list.length){
@@ -671,11 +783,11 @@ function renderRec(){
   S.classes.forEach(function(c){ sel.appendChild(new Option(c.name,c.id)); });
   if(keep) sel.value=keep;
 
-  var rs=filteredRecords(), count={pending:0,late:0,"class":0,video:0};
+  var rs=filteredRecords(), count={pending:0,booked:0,late:0,"class":0,video:0};
   rs.forEach(function(r){ count[statusOf(r)]++; });
   var tiles=$("recTiles"); tiles.innerHTML="";
-  [["t-pending",count.pending,"待補"],["t-late",count.late,"逾期"],
-   ["t-class",count["class"],"實體補課"],["t-video",count.video,"影片補課"]].forEach(function(t){
+  [["t-pending",count.pending,"待安排"],["t-booked",count.booked,"已約"],["t-late",count.late,"逾期"],
+   ["t-class",count["class"],"實體"],["t-video",count.video,"影片"]].forEach(function(t){
     var d=el("div","tile "+t[0]); d.appendChild(el("b",null,String(t[1])));
     d.appendChild(el("span",null,t[2])); tiles.appendChild(d);
   });
@@ -703,7 +815,7 @@ function renderRec(){
     "此範圍沒有紀錄");
 
   var sf=$("recStatus"); sf.innerHTML="";
-  [["all","全部"],["open","未補完"],["class","實體補課"],["video","補課系統影片"]].forEach(function(o){
+  [["all","全部"],["open","未補完"],["booked","已約"],["class","實體補課"],["video","補課系統影片"]].forEach(function(o){
     var b=el("button","chip tab",o[1]); b.type="button";
     b.setAttribute("aria-pressed", S.recStatus===o[0]?"true":"false");
     b.onclick=function(){ S.recStatus=o[0]; renderRec(); };
@@ -726,11 +838,14 @@ function csvCell(v){ v=String(v==null?"":v); return /[",\n]/.test(v)?'"'+v.repla
 function exportCSV(){
   var rs=filteredRecords().sort(function(a,b){ return a.absentDate<b.absentDate?-1:1; });
   if(!rs.length){ toast("這個範圍沒有可匯出的資料"); return; }
-  var lines=[["班級","學生","缺課日期","事由","缺課單元","狀態","補課方式","補課日期","備註"].join(",")];
+  var lines=[["班級","學生","缺課日期","事由","教材","級數","單元","狀態",
+    "預約補課日期","預約時間","補課方式","實際補課日期","備註"].join(",")];
   rs.forEach(function(r){
-    lines.push([r.className||className(r.classId), r.studentName, r.absentDate, r.reason||"", r.unit||"",
-      LABEL[statusOf(r)], r.makeupType==="video"?"補課系統影片":(r.makeupType==="class"?"實體補課":""),
-      r.makeupDate||"", r.note||""].map(csvCell).join(","));
+    lines.push([r.className||className(r.classId), r.studentName, r.absentDate, r.reason||"",
+      r.book||"", r.unitNo||"", r.progress||"", LABEL[statusOf(r)],
+      r.planDate||"", r.planTime||"",
+      r.makeupType==="video"?"補課系統影片":(r.makeupType==="class"?"實體補課":""),
+      r.makeupDate||"", r.note||(r.unit?"（舊單元："+r.unit+"）":"")].map(csvCell).join(","));
   });
   var blob=new Blob(["﻿"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
   var a=document.createElement("a");
@@ -780,7 +895,25 @@ function openSheet(r){
     var selR=el("select");
     ["","病假","事假","公假","家庭因素","其他"].forEach(function(o){ selR.appendChild(new Option(o||"未填",o)); });
     selR.value=r.reason||"";
-    var unit=el("input"); unit.type="text"; unit.value=r.unit||"";
+    var bs=el("select");
+    bs.appendChild(new Option("未填",""));
+    Object.keys(BOOKS).forEach(function(b){ bs.appendChild(new Option(b,b)); });
+    bs.value=r.book||"";
+    var us=el("select");
+    function fillUnits(){
+      us.innerHTML=""; us.appendChild(new Option("未填",""));
+      if(bs.value) for(var i=1;i<=BOOKS[bs.value];i++) us.appendChild(new Option(bs.value+i,String(i)));
+      us.value = (bs.value===(r.book||"")) ? (r.unitNo||"") : "";
+      us.disabled=!bs.value;
+    }
+    fillUnits();
+    bs.onchange=fillUnits;
+    var ps=el("select");
+    ps.appendChild(new Option("未填",""));
+    for(var pi=1;pi<=PROGRESS_MAX;pi++) ps.appendChild(new Option("U"+pi,String(pi)));
+    ps.value=r.progress||"";
+    var pd=el("input"); pd.type="date"; pd.value=r.planDate||"";
+    var pt=el("input"); pt.type="time"; pt.step="300"; pt.value=r.planTime||"";
     var note=el("textarea"); note.value=r.note||"";
     var selM=el("select");
     [["","尚未補課"],["class","實體補課"],["video","補課系統影片"]].forEach(function(o){ selM.appendChild(new Option(o[1],o[0])); });
@@ -788,17 +921,27 @@ function openSheet(r){
     var dMk=el("input"); dMk.type="date"; dMk.value=r.makeupDate||"";
 
     body.appendChild(el("p","hint", r.studentName+"　"+(r.className||className(r.classId))));
-    body.appendChild(field("缺課日期",dAbs));
-    var row=el("div","row"); row.appendChild(field("事由",selR)); row.appendChild(field("缺課單元",unit));
-    body.appendChild(row);
+    var rowA=el("div","row");
+    rowA.appendChild(field("缺課日期",dAbs)); rowA.appendChild(field("事由",selR));
+    body.appendChild(rowA);
+    var rowB=el("div","row");
+    rowB.appendChild(field("教材",bs)); rowB.appendChild(field("級數",us)); rowB.appendChild(field("單元",ps));
+    body.appendChild(rowB);
+    if(r.unit) body.appendChild(el("p","hint","原本填的內容：「"+r.unit+"」，選了上面的教材／級數後就會改用新格式顯示。"));
+    var rowC=el("div","row");
+    rowC.appendChild(field("預約補課日期",pd)); rowC.appendChild(field("預約時間",pt));
+    body.appendChild(rowC);
     body.appendChild(field("備註",note));
-    var row2=el("div","row"); row2.appendChild(field("補課方式",selM)); row2.appendChild(field("補課日期",dMk));
+    var row2=el("div","row"); row2.appendChild(field("補課方式",selM)); row2.appendChild(field("實際補課日期",dMk));
     body.appendChild(row2);
     var save=el("button","btn wide","儲存");
     save.onclick=function(){
-      r.absentDate=dAbs.value||r.absentDate; r.reason=selR.value; r.unit=unit.value.trim(); r.note=note.value.trim();
+      r.absentDate=dAbs.value||r.absentDate; r.reason=selR.value; r.note=note.value.trim();
+      r.book=bs.value; r.unitNo=us.value; r.progress=ps.value;
+      if(r.book||r.progress) r.unit="";
+      r.planDate=pd.value||""; r.planTime=r.planDate ? (pt.value||"") : "";
       r.makeupType=selM.value||"";
-      r.makeupDate=r.makeupType ? (dMk.value||today()) : "";
+      r.makeupDate=r.makeupType ? (dMk.value||r.planDate||today()) : "";
       put("records",r); closeSheet(); toast("已更新");
     };
     var cancel=el("button","btn ghost wide","取消"); cancel.onclick=closeSheet;
@@ -1149,6 +1292,12 @@ function renderAll(){
 /* ---------- 事件 ---------- */
 $("logClass").onchange=function(){ S.logPicked={}; renderLog(); };
 $("logSubmit").onclick=submitLog;
+$("addLesson").onclick=function(){
+  if(S.lessons.length>=6){ toast("一次最多 6 堂"); return; }
+  var last=S.lessons[S.lessons.length-1]||{};
+  S.lessons.push({book:last.book||"", unitNo:"", progress:""});
+  renderLessons();
+};
 $("recClass").onchange=renderRec;
 $("recMonth").onchange=renderRec;
 $("exportBtn").onclick=exportCSV;
