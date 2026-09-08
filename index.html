@@ -72,10 +72,14 @@ input[type=text],input[type=url],input[type=date],input[type=month],input[type=t
   width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:9px;
   background:var(--surface); color:var(--ink); appearance:none;}
 input[type=date],input[type=month],input[type=time]{font-family:var(--mono); font-size:14px;}
-.lesson{display:flex; gap:7px; align-items:center;}
-.lesson select{padding:9px 10px; font-size:14px;}
-.lesson .no{font-family:var(--mono); font-size:12px; color:var(--ink-3); flex:0 0 auto; width:22px;}
-.lesson .rm{flex:0 0 auto; color:var(--ink-3); font-size:18px; line-height:1; padding:4px 6px;}
+.lesson{border:1px solid var(--line); border-radius:10px; padding:10px 11px;
+  display:flex; flex-direction:column; gap:8px;}
+.lhead{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+.lhead .no{font-size:11.5px; font-weight:700; letter-spacing:.12em; color:var(--ink-3);}
+.lhead .rm{color:var(--ink-3); font-size:17px; line-height:1; padding:2px 6px;}
+.lhead .rm:hover{color:var(--bad)}
+.lsel{display:flex; gap:7px;}
+.lsel select{flex:1; min-width:0; padding:9px 8px; font-size:14px;}
 textarea{resize:vertical; min-height:64px; line-height:1.55;}
 input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,.chip:focus-visible{
   outline:2px solid var(--accent); outline-offset:2px;}
@@ -205,7 +209,6 @@ ol.steps li{margin-bottom:4px}
         <div class="sec-title" style="margin:2px 0 8px">學生 <span class="count" id="logSelCount">未選</span></div>
         <div class="picker" id="logStudents"></div>
       </div>
-      <label class="f"><span>缺課日期</span><input type="date" id="logDate"></label>
       <div>
         <div class="sec-title" style="margin:2px 0 8px">缺課堂數
           <button class="linkbtn" id="addLesson">＋ 再加一堂</button>
@@ -226,7 +229,7 @@ ol.steps li{margin-bottom:4px}
         </div>
       </details>
       <button class="btn wide" id="logSubmit">登記請假</button>
-      <p class="hint">可一次點選多位學生。缺課兩堂就按「再加一堂」，送出後會拆成兩筆各自獨立的紀錄。</p>
+      <p class="hint">可一次點選多位學生。缺課兩堂就按「再加一堂」，每堂各自填日期（不同天也可以），送出後拆成獨立的紀錄。</p>
     </div>
   </section>
 
@@ -425,7 +428,7 @@ function doPost(e){
 var S = { classes:[], students:[], records:[], tomb:{}, queue:[],
           view:"todo", url:"", syncing:false, lastSync:"", syncErr:"",
           logPicked:{}, todoClass:"", recStatus:"all",
-          lessons:[{book:"",unitNo:"",progress:""}] };
+          lessons:[] };
 var LS="mt-data-v2", LS_URL="mt-url-v2";
 
 function $(id){ return document.getElementById(id); }
@@ -591,14 +594,27 @@ function renderLog(){
 
 function lessonPicker(L, idx){
   var wrap=el("div","lesson");
-  wrap.appendChild(el("span","no", "第"+(idx+1)+"堂"));
 
+  var head=el("div","lhead");
+  head.appendChild(el("span","no","第 "+(idx+1)+" 堂"));
+  if(S.lessons.length>1){
+    var rm=el("button","rm","×"); rm.type="button"; rm.title="移除這堂";
+    rm.onclick=function(){ S.lessons.splice(idx,1); renderLessons(); };
+    head.appendChild(rm);
+  }
+  wrap.appendChild(head);
+
+  var d=el("input"); d.type="date"; d.value=L.date||today();
+  d.onchange=function(){ L.date=d.value||today(); };
+  wrap.appendChild(d);
+
+  var sels=el("div","lsel");
   var bs=el("select");
   bs.appendChild(new Option("教材",""));
   Object.keys(BOOKS).forEach(function(b){ bs.appendChild(new Option(b,b)); });
   bs.value=L.book||"";
   bs.onchange=function(){ L.book=bs.value; L.unitNo=""; renderLessons(); };
-  wrap.appendChild(bs);
+  sels.appendChild(bs);
 
   var us=el("select");
   us.appendChild(new Option("級數",""));
@@ -606,20 +622,16 @@ function lessonPicker(L, idx){
   us.value=L.unitNo||"";
   us.disabled=!L.book;
   us.onchange=function(){ L.unitNo=us.value; };
-  wrap.appendChild(us);
+  sels.appendChild(us);
 
   var ps=el("select");
   ps.appendChild(new Option("單元",""));
   for(var j=1;j<=PROGRESS_MAX;j++) ps.appendChild(new Option("U"+j, String(j)));
   ps.value=L.progress||"";
   ps.onchange=function(){ L.progress=ps.value; };
-  wrap.appendChild(ps);
+  sels.appendChild(ps);
 
-  if(S.lessons.length>1){
-    var rm=el("button","rm","×"); rm.type="button"; rm.title="移除這堂";
-    rm.onclick=function(){ S.lessons.splice(idx,1); renderLessons(); };
-    wrap.appendChild(rm);
-  }
+  wrap.appendChild(sels);
   return wrap;
 }
 function renderLessons(){
@@ -631,23 +643,23 @@ function renderLessons(){
 function submitLog(){
   var ids=Object.keys(S.logPicked);
   if(!ids.length){ toast("請先選擇學生"); return; }
-  var date=$("logDate").value||today(), cid=$("logClass").value;
+  var cid=$("logClass").value;
   var lessons=S.lessons.slice();
-  if(!lessons.length) lessons=[{book:"",unitNo:"",progress:""}];
+  if(!lessons.length) lessons=[{date:today(), book:"",unitNo:"",progress:""}];
   var made=0;
   ids.forEach(function(sid){
     var st=null; S.students.forEach(function(x){ if(x.id===sid) st=x; });
     lessons.forEach(function(L){
       made++;
       put("records",{ id:uid(), studentId:sid, studentName:st?st.name:"（已刪除）",
-        classId:cid, className:className(cid), absentDate:date,
+        classId:cid, className:className(cid), absentDate:L.date||today(),
         reason:$("logReason").value, book:L.book||"", unitNo:L.unitNo||"", progress:L.progress||"",
         unit:"", note:$("logNote").value.trim(),
         planDate:"", planTime:"", makeupType:"", makeupDate:"", createdAt:nowISO() });
     });
   });
   toast("已登記 "+made+" 筆（"+ids.length+" 位學生 × "+lessons.length+" 堂）");
-  S.logPicked={}; S.lessons=[{book:"",unitNo:"",progress:""}];
+  S.logPicked={}; S.lessons=[{date:today(), book:"",unitNo:"",progress:""}];
   $("logNote").value=""; $("logReason").value="";
   go("todo");
 }
@@ -1293,9 +1305,9 @@ function renderAll(){
 $("logClass").onchange=function(){ S.logPicked={}; renderLog(); };
 $("logSubmit").onclick=submitLog;
 $("addLesson").onclick=function(){
-  if(S.lessons.length>=6){ toast("一次最多 6 堂"); return; }
+  if(S.lessons.length>=8){ toast("一次最多 8 堂"); return; }
   var last=S.lessons[S.lessons.length-1]||{};
-  S.lessons.push({book:last.book||"", unitNo:"", progress:""});
+  S.lessons.push({date:last.date||today(), book:last.book||"", unitNo:"", progress:""});
   renderLessons();
 };
 $("recClass").onchange=renderRec;
@@ -1366,7 +1378,7 @@ window.addEventListener("online", function(){ if(S.url) sync(); });
 
 /* ---------- 啟動 ---------- */
 loadLocal();
-$("logDate").value=today();
+S.lessons=[{date:today(), book:"", unitNo:"", progress:""}];
 $("recMonth").value=thisMonth();
 setSync(S.url?"ok":"local", S.url?"連線中…":"本機模式");
 go("todo");
