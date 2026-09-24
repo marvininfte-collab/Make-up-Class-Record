@@ -17,6 +17,7 @@
   --ink:#18202B; --ink-2:#4B576A; --ink-3:#7E8899;
   --accent:#334A7D; --accent-ink:#FFFFFF; --accent-soft:#E3E9F5;
   --ok:#2C6B51; --ok-soft:#E0EEE7;
+  --sent:#1C6670; --sent-soft:#DCEBED;
   --video:#5A4A86; --video-soft:#EAE6F4;
   --warn:#87600F; --warn-soft:#F5EDDB;
   --bad:#A5423B; --bad-soft:#F6E3E1;
@@ -32,6 +33,7 @@
     --ink:#E7EBF1; --ink-2:#A7B1C0; --ink-3:#78828F;
     --accent:#93AAD9; --accent-ink:#131820; --accent-soft:#222D42;
     --ok:#7CC7A2; --ok-soft:#1B2C25;
+    --sent:#6FC0CA; --sent-soft:#14282B;
     --video:#AFA0DE; --video-soft:#241F35;
     --warn:#D6AE64; --warn-soft:#2E2617;
     --bad:#E28C84; --bad-soft:#32201E;
@@ -116,7 +118,7 @@ details.more .stack{margin-top:12px}
 .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
   padding:13px 14px; box-shadow:var(--shadow); border-left:3px solid var(--line);}
 .card.s-pending{border-left-color:var(--warn)} .card.s-late{border-left-color:var(--bad)}
-.card.s-booked{border-left-color:var(--accent)}
+.card.s-booked{border-left-color:var(--accent)} .card.s-sent{border-left-color:var(--sent)}
 .card.s-class{border-left-color:var(--ok)} .card.s-video{border-left-color:var(--video)}
 .card-head{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;}
 .who{font-size:16px; font-weight:700; letter-spacing:.02em;}
@@ -129,7 +131,9 @@ details.more .stack{margin-top:12px}
 .p-pending{background:var(--warn-soft); color:var(--warn)}
 .p-late{background:var(--bad-soft); color:var(--bad)}
 .p-booked{background:var(--accent-soft); color:var(--accent)}
+.p-sent{background:var(--sent-soft); color:var(--sent)}
 .act-book{background:var(--accent-soft); color:var(--accent); font-weight:700;}
+.act-sent{background:var(--sent-soft); color:var(--sent); font-weight:700;}
 .p-class{background:var(--ok-soft); color:var(--ok)}
 .p-video{background:var(--video-soft); color:var(--video)}
 .acts{display:flex; gap:7px; margin-top:11px; flex-wrap:wrap;}
@@ -143,13 +147,13 @@ details.more .stack{margin-top:12px}
 .empty{text-align:center; padding:34px 18px; color:var(--ink-3); font-size:14px;
   border:1px dashed var(--line); border-radius:var(--radius); line-height:1.7;}
 
-.tiles{display:grid; grid-template-columns:repeat(5,1fr); gap:6px;}
+.tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:7px;}
 .tile{background:var(--surface); border:1px solid var(--line); border-radius:10px;
   padding:11px 4px; text-align:center;}
 .tile b{display:block; font-family:var(--mono); font-size:20px; font-weight:500; line-height:1.25;}
 .tile span{font-size:10.5px; color:var(--ink-3); letter-spacing:0;}
 .tile.t-pending b{color:var(--warn)} .tile.t-late b{color:var(--bad)}
-.tile.t-booked b{color:var(--accent)}
+.tile.t-booked b{color:var(--accent)} .tile.t-sent b{color:var(--sent)}
 .tile.t-class b{color:var(--ok)} .tile.t-video b{color:var(--video)}
 
 .tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface);}
@@ -323,7 +327,7 @@ const SHEETS = {
   classes:  ['id','name','createdAt','updatedAt','deleted'],
   students: ['id','classId','name','createdAt','updatedAt','deleted'],
   records:  ['id','studentId','studentName','classId','className','absentDate','reason',
-             'book','unitNo','progress','unit','note','planDate','planTime',
+             'book','unitNo','progress','unit','note','planDate','planTime','sentDate',
              'makeupType','makeupDate','createdAt','updatedAt','deleted']
 };
 
@@ -445,9 +449,11 @@ function statusOf(r){
   if(r.makeupType==="class") return "class";
   if(r.makeupType==="video") return "video";
   if(r.planDate) return dayDiff(r.planDate, today())>0 ? "late" : "booked";
+  if(r.sentDate) return dayDiff(r.sentDate, today())>14 ? "late" : "sent";
   return dayDiff(r.absentDate, today())>14 ? "late" : "pending";
 }
-var LABEL={pending:"待安排", booked:"已約補課", late:"逾期未補", "class":"實體補課", video:"補課系統影片"};
+var LABEL={pending:"待安排", booked:"已約補課", sent:"已傳送影片", late:"逾期未補",
+           "class":"實體補課", video:"補課系統影片"};
 
 var BOOKS={ MJ:16, TJ:8 };
 var PROGRESS_MAX=28;
@@ -655,7 +661,7 @@ function submitLog(){
         classId:cid, className:className(cid), absentDate:L.date||today(),
         reason:$("logReason").value, book:L.book||"", unitNo:L.unitNo||"", progress:L.progress||"",
         unit:"", note:$("logNote").value.trim(),
-        planDate:"", planTime:"", makeupType:"", makeupDate:"", createdAt:nowISO() });
+        planDate:"", planTime:"", sentDate:"", makeupType:"", makeupDate:"", createdAt:nowISO() });
     });
   });
   toast("已登記 "+made+" 筆（"+ids.length+" 位學生 × "+lessons.length+" 堂）");
@@ -678,8 +684,11 @@ function cardFor(r){
   if(r.reason) meta.appendChild(el("span",null,r.reason));
   var ut=unitText(r); if(ut) meta.appendChild(el("span",null,ut));
   if(r.makeupType && r.makeupDate) meta.appendChild(el("span",null,(r.makeupType==="video"?"影片 ":"實體 ")+r.makeupDate));
-  else if(r.planDate) meta.appendChild(el("span",null,"約 "+planText(r)));
-  if(!r.makeupType && !r.planDate){ var g=dayDiff(r.absentDate, today()); if(g>0) meta.appendChild(el("span",null,"已過 "+g+" 天")); }
+  else {
+    if(r.planDate) meta.appendChild(el("span",null,"約 "+planText(r)));
+    if(r.sentDate) meta.appendChild(el("span",null,"已傳送 "+r.sentDate));
+  }
+  if(!r.makeupType && !r.planDate && !r.sentDate){ var g=dayDiff(r.absentDate, today()); if(g>0) meta.appendChild(el("span",null,"已過 "+g+" 天")); }
   c.appendChild(meta);
   if(r.note) c.appendChild(el("div","note", r.note));
 
@@ -688,8 +697,11 @@ function cardFor(r){
     var b0=el("button","btn sm act-book", r.planDate?"改補課時間":"約補課時間");
     b0.onclick=function(){ bookMakeup(r); };
     var b1=el("button","btn sm act-ok","實體補課完成"); b1.onclick=function(){ complete(r,"class"); };
+    var b3=el("button","btn sm act-sent", r.sentDate?"改傳送日期":"已傳送補課系統");
+    b3.onclick=function(){ sendVideo(r); };
     var b2=el("button","btn sm act-video","已看補課影片"); b2.onclick=function(){ complete(r,"video"); };
-    acts.appendChild(b0); acts.appendChild(b1); acts.appendChild(b2); c.appendChild(acts);
+    acts.appendChild(b0); acts.appendChild(b1); acts.appendChild(b3); acts.appendChild(b2);
+    c.appendChild(acts);
   }
   var foot=el("div","card-foot");
   var e1=el("button","linkbtn","編輯"); e1.onclick=function(){ openSheet(r); };
@@ -707,8 +719,32 @@ function cardFor(r){
   return c;
 }
 function complete(r,type){
-  r.makeupType=type; r.makeupDate= r.planDate || today(); put("records",r);
-  toast(type==="video"?"已記為補課系統影片":"已記為實體補課");
+  r.makeupType=type;
+  r.makeupDate = type==="class" ? (r.planDate || today()) : today();
+  put("records",r);
+  toast(type==="video"?"已記為看完補課影片":"已記為實體補課");
+}
+function sendVideo(r){
+  openSheetRaw("傳送補課系統影片", function(body){
+    body.appendChild(el("p","hint", r.studentName+"　"+(r.className||className(r.classId))+"　缺課 "+r.absentDate+
+      (unitText(r)?"　"+unitText(r):"")));
+    var l=el("label","f"); l.appendChild(el("span",null,"傳送日期"));
+    var d=el("input"); d.type="date"; d.value=r.sentDate||today();
+    l.appendChild(d); body.appendChild(l);
+    body.appendChild(el("p","hint","記下影片是哪天傳給家長的。卡片會顯示「已傳送影片」，等孩子看完再按「已看補課影片」結案。超過 14 天沒回報會自動轉成逾期。"));
+    var ok=el("button","btn wide","儲存");
+    ok.onclick=function(){
+      r.sentDate=d.value||"";
+      put("records",r); closeSheet();
+      toast(r.sentDate ? "已記錄傳送日期 "+r.sentDate : "已清除傳送紀錄");
+    };
+    var clr=el("button","btn ghost wide","清除傳送紀錄");
+    clr.onclick=function(){ r.sentDate=""; put("records",r); closeSheet(); toast("已清除傳送紀錄"); };
+    var no=el("button","btn ghost wide","取消"); no.onclick=closeSheet;
+    body.appendChild(ok);
+    if(r.sentDate) body.appendChild(clr);
+    body.appendChild(no);
+  });
 }
 function bookMakeup(r){
   openSheetRaw("預約補課時間", function(body){
@@ -747,12 +783,12 @@ function renderTodo(){
     b.onclick=function(){ S.todoClass=o.id; renderTodo(); };
     f.appendChild(b);
   });
-  var rank={late:0, pending:1, booked:2};
+  var rank={late:0, pending:1, booked:2, sent:3};
   var list=S.records.filter(function(r){ return !r.makeupType && (!S.todoClass || r.classId===S.todoClass); })
     .sort(function(a,b){
       var ra=rank[statusOf(a)], rb=rank[statusOf(b)];
       if(ra!==rb) return ra-rb;
-      var da=a.planDate||a.absentDate, db=b.planDate||b.absentDate;
+      var da=a.planDate||a.sentDate||a.absentDate, db=b.planDate||b.sentDate||b.absentDate;
       return da<db?-1:(da>db?1:0);
     });
   $("todoCount").textContent = list.length ? list.length+" 筆" : "";
@@ -795,11 +831,11 @@ function renderRec(){
   S.classes.forEach(function(c){ sel.appendChild(new Option(c.name,c.id)); });
   if(keep) sel.value=keep;
 
-  var rs=filteredRecords(), count={pending:0,booked:0,late:0,"class":0,video:0};
+  var rs=filteredRecords(), count={pending:0,booked:0,sent:0,late:0,"class":0,video:0};
   rs.forEach(function(r){ count[statusOf(r)]++; });
   var tiles=$("recTiles"); tiles.innerHTML="";
-  [["t-pending",count.pending,"待安排"],["t-booked",count.booked,"已約"],["t-late",count.late,"逾期"],
-   ["t-class",count["class"],"實體"],["t-video",count.video,"影片"]].forEach(function(t){
+  [["t-pending",count.pending,"待安排"],["t-booked",count.booked,"已約補課"],["t-sent",count.sent,"已傳影片"],
+   ["t-late",count.late,"逾期"],["t-class",count["class"],"實體完成"],["t-video",count.video,"影片完成"]].forEach(function(t){
     var d=el("div","tile "+t[0]); d.appendChild(el("b",null,String(t[1])));
     d.appendChild(el("span",null,t[2])); tiles.appendChild(d);
   });
@@ -827,7 +863,8 @@ function renderRec(){
     "此範圍沒有紀錄");
 
   var sf=$("recStatus"); sf.innerHTML="";
-  [["all","全部"],["open","未補完"],["booked","已約"],["class","實體補課"],["video","補課系統影片"]].forEach(function(o){
+  [["all","全部"],["open","未補完"],["booked","已約補課"],["sent","已傳送影片"],
+   ["class","實體補課"],["video","補課系統影片"]].forEach(function(o){
     var b=el("button","chip tab",o[1]); b.type="button";
     b.setAttribute("aria-pressed", S.recStatus===o[0]?"true":"false");
     b.onclick=function(){ S.recStatus=o[0]; renderRec(); };
@@ -851,11 +888,11 @@ function exportCSV(){
   var rs=filteredRecords().sort(function(a,b){ return a.absentDate<b.absentDate?-1:1; });
   if(!rs.length){ toast("這個範圍沒有可匯出的資料"); return; }
   var lines=[["班級","學生","缺課日期","事由","教材","級數","單元","狀態",
-    "預約補課日期","預約時間","補課方式","實際補課日期","備註"].join(",")];
+    "預約補課日期","預約時間","影片傳送日期","補課方式","實際補課日期","備註"].join(",")];
   rs.forEach(function(r){
     lines.push([r.className||className(r.classId), r.studentName, r.absentDate, r.reason||"",
       r.book||"", r.unitNo||"", r.progress||"", LABEL[statusOf(r)],
-      r.planDate||"", r.planTime||"",
+      r.planDate||"", r.planTime||"", r.sentDate||"",
       r.makeupType==="video"?"補課系統影片":(r.makeupType==="class"?"實體補課":""),
       r.makeupDate||"", r.note||(r.unit?"（舊單元："+r.unit+"）":"")].map(csvCell).join(","));
   });
@@ -926,6 +963,7 @@ function openSheet(r){
     ps.value=r.progress||"";
     var pd=el("input"); pd.type="date"; pd.value=r.planDate||"";
     var pt=el("input"); pt.type="time"; pt.step="300"; pt.value=r.planTime||"";
+    var sd=el("input"); sd.type="date"; sd.value=r.sentDate||"";
     var note=el("textarea"); note.value=r.note||"";
     var selM=el("select");
     [["","尚未補課"],["class","實體補課"],["video","補課系統影片"]].forEach(function(o){ selM.appendChild(new Option(o[1],o[0])); });
@@ -943,6 +981,7 @@ function openSheet(r){
     var rowC=el("div","row");
     rowC.appendChild(field("預約補課日期",pd)); rowC.appendChild(field("預約時間",pt));
     body.appendChild(rowC);
+    body.appendChild(field("影片傳送日期",sd));
     body.appendChild(field("備註",note));
     var row2=el("div","row"); row2.appendChild(field("補課方式",selM)); row2.appendChild(field("實際補課日期",dMk));
     body.appendChild(row2);
@@ -952,6 +991,7 @@ function openSheet(r){
       r.book=bs.value; r.unitNo=us.value; r.progress=ps.value;
       if(r.book||r.progress) r.unit="";
       r.planDate=pd.value||""; r.planTime=r.planDate ? (pt.value||"") : "";
+      r.sentDate=sd.value||"";
       r.makeupType=selM.value||"";
       r.makeupDate=r.makeupType ? (dMk.value||r.planDate||today()) : "";
       put("records",r); closeSheet(); toast("已更新");
