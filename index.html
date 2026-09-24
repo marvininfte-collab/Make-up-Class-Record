@@ -136,8 +136,8 @@ details.more .stack{margin-top:12px}
 .act-sent{background:var(--sent-soft); color:var(--sent); font-weight:700;}
 .p-class{background:var(--ok-soft); color:var(--ok)}
 .p-video{background:var(--video-soft); color:var(--video)}
-.acts{display:flex; gap:7px; margin-top:11px; flex-wrap:wrap;}
-.acts .btn{flex:1; min-width:104px;}
+.acts{display:grid; grid-template-columns:repeat(2,1fr); gap:7px; margin-top:11px;}
+.acts .btn{min-width:0; padding:10px 6px; text-align:center;}
 .act-ok{background:var(--ok-soft); color:var(--ok); font-weight:700;}
 .act-video{background:var(--video-soft); color:var(--video); font-weight:700;}
 .linkbtn{background:none; padding:0; font-size:12.5px; color:var(--ink-3);
@@ -697,7 +697,7 @@ function cardFor(r){
     var b0=el("button","btn sm act-book", r.planDate?"改補課時間":"約補課時間");
     b0.onclick=function(){ bookMakeup(r); };
     var b1=el("button","btn sm act-ok","實體補課完成"); b1.onclick=function(){ complete(r,"class"); };
-    var b3=el("button","btn sm act-sent", r.sentDate?"改傳送日期":"已傳送補課系統");
+    var b3=el("button","btn sm act-sent", r.sentDate?"改傳送日期":"已傳送影片");
     b3.onclick=function(){ sendVideo(r); };
     var b2=el("button","btn sm act-video","已看補課影片"); b2.onclick=function(){ complete(r,"video"); };
     acts.appendChild(b0); acts.appendChild(b1); acts.appendChild(b3); acts.appendChild(b2);
